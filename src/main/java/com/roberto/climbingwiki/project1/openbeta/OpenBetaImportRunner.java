@@ -1,5 +1,6 @@
 package com.roberto.climbingwiki.project1.openbeta;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -34,7 +35,8 @@ public class OpenBetaImportRunner implements CommandLineRunner {
 
     private final OpenBetaClient client;
     private final OpenBetaImportService importService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper =
+            new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final List<String> ancestorsPath;
     private final String cachePath;
 

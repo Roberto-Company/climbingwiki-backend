@@ -44,6 +44,12 @@ public class ZoneService {
                 .map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
     }
 
+    public Page<ZoneResponse> findByName(String name, Pageable pageable) {
+        return zoneRepository
+                .findByNameContainingIgnoreCase(name, pageable)
+                .map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
+    }
+
     public ZoneResponse findById(Long id) {
         Zone zone = zoneRepository.findById(id).orElseThrow(() -> new ZoneNotFoundException(id));
         return ZoneResponse.from(zone, routeTypesForZone(id));

@@ -31,9 +31,12 @@ public class CragController {
 
     @GetMapping
     public PagedResponse<CragResponse> list(
-            @RequestParam(required = false) Long zoneId, @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        return PagedResponse.from(
-                zoneId != null ? cragService.findByZoneId(zoneId, pageable) : cragService.findAll(pageable));
+            @RequestParam(required = false) Long zoneId,
+            @RequestParam(required = false) String name,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
+        if (zoneId != null) return PagedResponse.from(cragService.findByZoneId(zoneId, pageable));
+        if (name != null && !name.isBlank()) return PagedResponse.from(cragService.findByName(name, pageable));
+        return PagedResponse.from(cragService.findAll(pageable));
     }
 
     @GetMapping("/{id}")

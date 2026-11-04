@@ -15,5 +15,7 @@ public interface ZoneRepository extends JpaRepository<Zone, Long> {
 
     Page<Zone> findByParentZoneIsNull(Pageable pageable);
 
+    Page<Zone> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
     Optional<Zone> findByExternalSourceAndExternalId(String externalSource, String externalId);
 }

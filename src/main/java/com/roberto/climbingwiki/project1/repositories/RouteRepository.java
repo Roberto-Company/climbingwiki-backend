@@ -13,6 +13,8 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     Page<Route> findBySectorId(Long sectorId, Pageable pageable);
 
+    Page<Route> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
     @Query(
             "select distinct r.sector.id as sectorId, r.routeType as routeType "
                     + "from Route r where r.sector.id in :sectorIds")

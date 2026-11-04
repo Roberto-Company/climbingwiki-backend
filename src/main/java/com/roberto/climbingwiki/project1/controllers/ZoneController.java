@@ -33,13 +33,11 @@ public class ZoneController {
     public PagedResponse<ZoneResponse> list(
             @RequestParam(required = false) Long parentZoneId,
             @RequestParam(required = false, defaultValue = "false") boolean rootOnly,
+            @RequestParam(required = false) String name,
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        if (parentZoneId != null) {
-            return PagedResponse.from(zoneService.findByParentZoneId(parentZoneId, pageable));
-        }
-        if (rootOnly) {
-            return PagedResponse.from(zoneService.findRootZones(pageable));
-        }
+        if (parentZoneId != null) return PagedResponse.from(zoneService.findByParentZoneId(parentZoneId, pageable));
+        if (rootOnly) return PagedResponse.from(zoneService.findRootZones(pageable));
+        if (name != null && !name.isBlank()) return PagedResponse.from(zoneService.findByName(name, pageable));
         return PagedResponse.from(zoneService.findAll(pageable));
     }
 

@@ -48,6 +48,10 @@ public class RouteService {
         return routeRepository.findBySectorId(sectorId, pageable).map(RouteResponse::from);
     }
 
+    public Page<RouteResponse> findByName(String name, Pageable pageable) {
+        return routeRepository.findByNameContainingIgnoreCase(name, pageable).map(RouteResponse::from);
+    }
+
     public RouteResponse findById(Long id) {
         return routeRepository.findById(id)
                 .map(RouteResponse::from)

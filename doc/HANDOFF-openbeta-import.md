@@ -95,70 +95,57 @@ Catalunya (7), Alcañiz (2) have real data, and El Helechal's quality is poor (m
 climbs, no FA, length always -1, non-standard grade notation like "4C"/"5B"). Revisit later, not
 abandoned.
 
-## In progress / what to do next
+## Status: done
 
-**Status: preview succeeded for Lizard Boulder; first real-import attempt failed; pipeline
-refactored since then — re-run import using the new cache flow below.**
+Lizard Boulder import completed successfully against the live shared DB this session. No more
+next steps for this target — Spain remains explicitly deferred (see above) for whenever that's
+picked up.
 
-Timeline this session: two `openbeta-preview` attempts hit Cloudflare 504s from `api.openbeta.io`
+Timeline: two `openbeta-preview` attempts hit Cloudflare 504s from `api.openbeta.io`
 ("retryable": true, "retry_after": 120 — OpenBeta being flaky, not our bug). A third attempt
-succeeded cleanly (~8s, no 504): `target/openbeta-preview.csv` has 7 rows (1 crag + 6 routes), 6
-flagged, all benign (`DUPLICATE_COORDS_WITH_PARENT` + `LENGTH_UNKNOWN` on every route — expected,
-see preview review below). Then the real `openbeta-import` run was attempted and hit a **fresh**
-504 of its own — because at the time, preview and import each did their own independent live
-`fetchBulkAreas` call, so a successful preview gave no guarantee about the import's separate
-fetch. Confirmed via direct log/DB inspection (not the background-task notification, which
-falsely reported exit 0) that nothing was written: DB counts unchanged at
-`zones=2, crags=1, routes=3, pitches=0`.
+succeeded cleanly (~8s, no 504): `target/openbeta-preview.csv` had 7 rows (1 crag + 6 routes), 6
+flagged, all benign (`DUPLICATE_COORDS_WITH_PARENT` + `LENGTH_UNKNOWN` on every route — expected).
+The first real `openbeta-import` attempt then hit a **fresh** 504 of its own, because at the time
+preview and import each did their own independent live `fetchBulkAreas` call — a clean preview
+gave no guarantee about import's separate fetch. Confirmed via direct log/DB inspection (not the
+background-task notification, which falsely reported exit 0) that nothing was written.
 
-**Fix applied (this session):** decoupled the network call from the DB write. `openbeta-preview`
-now also caches its raw fetch to `target/openbeta-raw-cache.json` (via
-`OpenBetaPreviewRunner` + injected `ObjectMapper`). `openbeta-import` accepts
-`--openbeta.import.cache=<path>` to import that exact cached payload with **zero live API
-calls** — falls back to a live fetch only if the flag is omitted. This means the whole
-preview-then-import workflow now only needs OpenBeta's flaky endpoint to succeed *once*, not
-twice. Removed the now-dead `OpenBetaImportService.importFromAncestorsPath` and its
-`OpenBetaClient` dependency (was only reachable from the old import runner code path); updated
-`OpenBetaImportServiceTest` accordingly. Also resolved the open question below: `upsertRoute` now
-nulls out a route's lat/lng when they match the parent crag's exactly (new `sameCoordinates`
-helper, `BigDecimal.compareTo`-based). Full suite still green (474 tests) after both changes.
+**Fix #1 (decoupling):** `openbeta-preview` now also caches its raw fetch to
+`target/openbeta-raw-cache.json`. `openbeta-import` accepts `--openbeta.import.cache=<path>` to
+import that exact cached payload with **zero live API calls** — falls back to a live fetch only
+if the flag is omitted. Removed the now-dead `OpenBetaImportService.importFromAncestorsPath` and
+its direct `OpenBetaClient` dependency; updated `OpenBetaImportServiceTest` accordingly.
 
-### Next steps, in order
+**Fix #2 (`DUPLICATE_COORDS_WITH_PARENT`)**: `upsertRoute` now nulls out a route's lat/lng when
+they exactly match the parent crag's, via a new `sameCoordinates` helper (`BigDecimal.compareTo`,
+scale-safe).
 
-1. Confirm the current project root path (it may have moved per `../HANDOFF.md`).
-2. Check for and clean up any lingering `java.exe` process bound to the preview/import port —
-   match by creation time / port in the command line. **Do not touch port 8080 / IntelliJ's
-   processes.**
-3. If `target/openbeta-raw-cache.json` from the successful preview run is still present and you
-   trust it's current (re-run `openbeta-preview` first if in doubt — it's a live fetch, so the
-   cache could go stale if OpenBeta's data changed), skip straight to step 5 using
-   `--openbeta.import.cache=target/openbeta-raw-cache.json`. Otherwise, (re-)run preview:
-   ```
-   ./mvnw -q spring-boot:run -Dspring-boot.run.profiles=openbeta-preview -Dspring-boot.run.arguments="--openbeta.import.ancestors=1db1e8ba-a40e-587c-88a4-64f5ea814b8e,5f05ed84-1a18-52d9-b8cf-77f8fd01e061,e7aeefae-15e1-5de7-a395-a48727784e98,f3c655b6-9c95-597f-aaa6-fd7d8a4865ec,e09fd62a-61aa-5668-aa0d-35813f7c9dcc,ef8e5f0a-5180-5ed0-93db-073c64c6fae6 --server.port=<free port>"
-   ```
-   Run in the background and wait for the completion notification rather than polling. This both
-   writes the CSV and refreshes the cache file in one fetch.
-4. Read `target/openbeta-preview.csv` and review the `issues` column — that's the whole point of
-   this step: catch data-quality problems before they reach the DB.
-5. **Only after that review**, and only with the user's explicit, specific go-ahead (shared-DB
-   caution above — a one-word "yes" to a prior question was not accepted by the auto-mode
-   classifier as sufficient for this irreversible live-DB write; ask again with the literal
-   command spelled out), run the real import **from the cache, not a fresh fetch**:
-   ```
-   ./mvnw spring-boot:run -Dspring-boot.run.profiles=openbeta-import -Dspring-boot.run.arguments="--openbeta.import.ancestors=<same path> --openbeta.import.cache=target/openbeta-raw-cache.json --server.port=<free port>"
-   ```
-   This writes to `zones`/`crags`/`sectors`/`routes`/`pitches` in the live shared DB, with no
-   dependency on OpenBeta's API being up at that moment.
-6. Kill the one-shot JVM afterward (same process-finding pattern as step 2).
-7. Verify via the DB row-count query below that the expected rows landed (1 new crag, 6 new
-   routes, plus pitches for Lizard Boulder).
+**Fix #3 (cache deserialization bug, found when actually running the cached import):**
+`OpenBetaAreaDto.isLeaf()` is a record method following the JavaBean `isXxx()` getter convention,
+so Jackson's *serializer* synthesized an extra `"leaf"` JSON property when the preview wrote the
+cache — but the canonical record constructor (used for *deserialization*) has no `leaf` parameter,
+so reading the cache back threw `UnrecognizedPropertyException: Unrecognized field "leaf"`. Fixed
+by configuring `OpenBetaImportRunner`'s `ObjectMapper` with
+`.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)` rather than touching the
+DTO's public API. (Separately, both runners construct their own `ObjectMapper` directly rather
+than relying on Spring DI — `spring-boot-starter-webmvc` in Spring Boot 4 doesn't transitively
+pull in `JacksonAutoConfiguration`, so no `ObjectMapper` bean exists in this app's context.)
+
+Full suite green (474 tests) after all three fixes. The cached import then ran clean:
+`OpenBeta import finished: zones[+0 ~0] crags[+1 ~0] sectors[+1 ~0] routes[+6 ~0] grades
+unmatched=0`, verified against direct DB row counts (see below) — not just the runner's own log
+line.
 
 ## Current live DB state (last checked this session)
 
 ```
-grading_systems = 6, grades = 165   (seeded by this session)
-zones = 2, crags = 1, routes = 3, pitches = 0   (pre-existing, not from this work — leave alone)
+grading_systems = 6, grades = 165
+zones = 2, crags = 2, routes = 9, pitches = 6
 ```
+
+Pre-import baseline was `zones=2, crags=1, routes=3, pitches=0`; the Lizard Boulder import added
+exactly `+1 crag, +1 sector, +6 routes, +6 pitches` (sectors aren't in the row-count query above —
+confirmed via the runner's own counters instead).
 
 ## Useful commands
 

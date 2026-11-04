@@ -37,6 +37,10 @@ public class CragService {
         return cragRepository.findByZoneId(zoneId, pageable).map(CragResponse::from);
     }
 
+    public Page<CragResponse> findByName(String name, Pageable pageable) {
+        return cragRepository.findByNameContainingIgnoreCase(name, pageable).map(CragResponse::from);
+    }
+
     public CragResponse findById(Long id) {
         return cragRepository.findById(id)
                 .map(CragResponse::from)

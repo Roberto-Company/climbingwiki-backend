@@ -10,5 +10,7 @@ public interface CragRepository extends JpaRepository<Crag, Long> {
 
     Page<Crag> findByZoneId(Long zoneId, Pageable pageable);
 
+    Page<Crag> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
     Optional<Crag> findByExternalSourceAndExternalId(String externalSource, String externalId);
 }
