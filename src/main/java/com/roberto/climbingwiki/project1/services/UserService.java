@@ -24,13 +24,15 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public List<UserResponse> findAll() {
-        return userRepository.findAll().stream().map(UserResponse::from).toList();
+    public List<UserResponse> findAll(AuthenticatedUser viewer) {
+        return userRepository.findAll().stream()
+                .map(user -> UserResponse.forViewer(user, viewer))
+                .toList();
     }
 
-    public UserResponse findById(Long id) {
+    public UserResponse findById(Long id, AuthenticatedUser viewer) {
         return userRepository.findById(id)
-                .map(UserResponse::from)
+                .map(user -> UserResponse.forViewer(user, viewer))
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
 
@@ -53,7 +55,7 @@ public class UserService {
         }
         User user = userRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
         applyRequest(user, request, id, requester);
-        return UserResponse.from(userRepository.save(user));
+        return UserResponse.forViewer(userRepository.save(user), requester);
     }
 
     @Transactional

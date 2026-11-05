@@ -15,4 +15,9 @@ public record AuthenticatedUser(Long id, String username, User.Role role) {
     public boolean isSelfOrModeratorOrAdmin(Long ownerId) {
         return id.equals(ownerId) || isModeratorOrAdmin();
     }
+
+    /** Private contact data (e.g. email) is visible only to its owner and to admins, not moderators. */
+    public boolean canSeePrivateDataOf(Long ownerId) {
+        return id.equals(ownerId) || isAdmin();
+    }
 }

@@ -29,13 +29,13 @@ public class UserController {
     }
 
     @GetMapping
-    public List<UserResponse> list() {
-        return userService.findAll();
+    public List<UserResponse> list(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return userService.findAll(principal);
     }
 
     @GetMapping("/{id}")
-    public UserResponse get(@PathVariable Long id) {
-        return userService.findById(id);
+    public UserResponse get(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser principal) {
+        return userService.findById(id, principal);
     }
 
     @PostMapping

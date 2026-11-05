@@ -46,7 +46,7 @@ class UserControllerTest {
 
     @Test
     void list_returnsAllUsers() throws Exception {
-        when(userService.findAll()).thenReturn(List.of(response(1L, "jane"), response(2L, "bob")));
+        when(userService.findAll(any())).thenReturn(List.of(response(1L, "jane"), response(2L, "bob")));
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
@@ -56,7 +56,7 @@ class UserControllerTest {
 
     @Test
     void list_neverExposesPasswordHash() throws Exception {
-        when(userService.findAll()).thenReturn(List.of(response(1L, "jane")));
+        when(userService.findAll(any())).thenReturn(List.of(response(1L, "jane")));
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
@@ -65,8 +65,19 @@ class UserControllerTest {
     }
 
     @Test
+    void list_hiddenEmail_isNotExposed() throws Exception {
+        UserResponse withoutEmail =
+                new UserResponse(1L, "jane", null, "Jane Climber", null, null, User.Role.USER, null);
+        when(userService.findAll(any())).thenReturn(List.of(withoutEmail));
+
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").doesNotExist());
+    }
+
+    @Test
     void get_existingUser_returnsUser() throws Exception {
-        when(userService.findById(1L)).thenReturn(response(1L, "jane"));
+        when(userService.findById(eq(1L), any())).thenReturn(response(1L, "jane"));
 
         mockMvc.perform(get("/api/users/1"))
                 .andExpect(status().isOk())
@@ -75,7 +86,7 @@ class UserControllerTest {
 
     @Test
     void get_missingUser_returns404() throws Exception {
-        when(userService.findById(99L)).thenThrow(new UserNotFoundException(99L));
+        when(userService.findById(eq(99L), any())).thenThrow(new UserNotFoundException(99L));
 
         mockMvc.perform(get("/api/users/99")).andExpect(status().isNotFound());
     }
