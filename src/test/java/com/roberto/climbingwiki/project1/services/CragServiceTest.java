@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.services;
 
+import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,25 +64,15 @@ class CragServiceTest {
     }
 
     @Test
-    void findAll_returnsMappedResponses() {
+    void search_returnsMappedResponses() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Crag> cragPage = new PageImpl<>(List.of(crag(1L, "Montserrat"), crag(2L, "Siurana")), pageable, 2);
-        when(cragRepository.findAll(pageable)).thenReturn(cragPage);
+        when(cragRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Crag>>any(), eq(pageable)))
+                .thenReturn(cragPage);
 
-        Page<CragResponse> result = cragService.findAll(pageable);
+        Page<CragResponse> result = cragService.search(7L, "mont", pageable);
 
         assertThat(result.getContent()).extracting(CragResponse::name).containsExactly("Montserrat", "Siurana");
-    }
-
-    @Test
-    void findByZoneId_returnsMappedResponses() {
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<Crag> cragPage = new PageImpl<>(List.of(crag(1L, "Montserrat")), pageable, 1);
-        when(cragRepository.findByZoneId(7L, pageable)).thenReturn(cragPage);
-
-        Page<CragResponse> result = cragService.findByZoneId(7L, pageable);
-
-        assertThat(result.getContent()).extracting(CragResponse::name).containsExactly("Montserrat");
     }
 
     @Test

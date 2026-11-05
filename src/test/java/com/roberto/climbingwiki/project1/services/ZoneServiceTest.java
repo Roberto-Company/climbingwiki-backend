@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.services;
 
+import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,36 +58,15 @@ class ZoneServiceTest {
     }
 
     @Test
-    void findAll_returnsMappedResponses() {
+    void search_returnsMappedResponses() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Zone> zonePage = new PageImpl<>(List.of(zone(1L, "Montserrat"), zone(2L, "Siurana")), pageable, 2);
-        when(zoneRepository.findAll(pageable)).thenReturn(zonePage);
+        when(zoneRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Zone>>any(), eq(pageable)))
+                .thenReturn(zonePage);
 
-        Page<ZoneResponse> result = zoneService.findAll(pageable);
+        Page<ZoneResponse> result = zoneService.search(null, true, "s", pageable);
 
         assertThat(result.getContent()).extracting(ZoneResponse::name).containsExactly("Montserrat", "Siurana");
-    }
-
-    @Test
-    void findByParentZoneId_returnsMappedResponses() {
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<Zone> zonePage = new PageImpl<>(List.of(zone(2L, "Sant Jeroni")), pageable, 1);
-        when(zoneRepository.findByParentZoneId(1L, pageable)).thenReturn(zonePage);
-
-        Page<ZoneResponse> result = zoneService.findByParentZoneId(1L, pageable);
-
-        assertThat(result.getContent()).extracting(ZoneResponse::name).containsExactly("Sant Jeroni");
-    }
-
-    @Test
-    void findRootZones_returnsMappedResponses() {
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<Zone> zonePage = new PageImpl<>(List.of(zone(1L, "Montserrat")), pageable, 1);
-        when(zoneRepository.findByParentZoneIsNull(pageable)).thenReturn(zonePage);
-
-        Page<ZoneResponse> result = zoneService.findRootZones(pageable);
-
-        assertThat(result.getContent()).extracting(ZoneResponse::name).containsExactly("Montserrat");
     }
 
     @Test

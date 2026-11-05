@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.controllers;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,7 +54,7 @@ class RouteControllerTest {
     @Test
     void list_returnsAllRoutes() throws Exception {
         Page<RouteResponse> page = new PageImpl<>(List.of(response(1L, "La Rambla"), response(2L, "Bla")));
-        when(routeService.findAll(any())).thenReturn(page);
+        when(routeService.search(isNull(), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/routes"))
                 .andExpect(status().isOk())
@@ -64,12 +66,22 @@ class RouteControllerTest {
     @Test
     void list_withSectorId_filtersBySector() throws Exception {
         Page<RouteResponse> page = new PageImpl<>(List.of(response(1L, "La Rambla")));
-        when(routeService.findBySectorId(eq(1L), any())).thenReturn(page);
+        when(routeService.search(eq(1L), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/routes").param("sectorId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].name").value("La Rambla"));
+    }
+
+    @Test
+    void list_withSectorIdAndName_combinesBothFilters() throws Exception {
+        when(routeService.search(eq(6L), eq("Marta"), any())).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/routes").param("sectorId", "6").param("name", "Marta"))
+                .andExpect(status().isOk());
+
+        verify(routeService).search(eq(6L), eq("Marta"), any());
     }
 
     @Test

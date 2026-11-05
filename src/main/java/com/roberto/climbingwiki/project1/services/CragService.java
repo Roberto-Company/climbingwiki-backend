@@ -1,5 +1,6 @@
 package com.roberto.climbingwiki.project1.services;
 
+import com.roberto.climbingwiki.project1.repositories.CatalogSpecifications;
 import com.roberto.climbingwiki.project1.dtos.CragRequest;
 import com.roberto.climbingwiki.project1.dtos.CragResponse;
 import com.roberto.climbingwiki.project1.exceptions.CragNotFoundException;
@@ -29,16 +30,11 @@ public class CragService {
         this.userRepository = userRepository;
     }
 
-    public Page<CragResponse> findAll(Pageable pageable) {
-        return cragRepository.findAll(pageable).map(CragResponse::from);
-    }
-
-    public Page<CragResponse> findByZoneId(Long zoneId, Pageable pageable) {
-        return cragRepository.findByZoneId(zoneId, pageable).map(CragResponse::from);
-    }
-
-    public Page<CragResponse> findByName(String name, Pageable pageable) {
-        return cragRepository.findByNameContainingIgnoreCase(name, pageable).map(CragResponse::from);
+    /** Lists crags matching every given filter; null or blank filters are ignored. */
+    public Page<CragResponse> search(Long zoneId, String name, Pageable pageable) {
+        return cragRepository
+                .findAll(CatalogSpecifications.cragFilter(zoneId, name), pageable)
+                .map(CragResponse::from);
     }
 
     public CragResponse findById(Long id) {

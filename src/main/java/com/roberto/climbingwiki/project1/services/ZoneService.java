@@ -1,5 +1,6 @@
 package com.roberto.climbingwiki.project1.services;
 
+import com.roberto.climbingwiki.project1.repositories.CatalogSpecifications;
 import com.roberto.climbingwiki.project1.dtos.ZoneRequest;
 import com.roberto.climbingwiki.project1.dtos.ZoneResponse;
 import com.roberto.climbingwiki.project1.exceptions.InvalidZoneParentException;
@@ -28,25 +29,10 @@ public class ZoneService {
         this.routeRepository = routeRepository;
     }
 
-    public Page<ZoneResponse> findAll(Pageable pageable) {
-        return zoneRepository.findAll(pageable).map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
-    }
-
-    public Page<ZoneResponse> findByParentZoneId(Long parentZoneId, Pageable pageable) {
+    /** Lists zones matching every given filter; null or blank filters are ignored. */
+    public Page<ZoneResponse> search(Long parentZoneId, boolean rootOnly, String name, Pageable pageable) {
         return zoneRepository
-                .findByParentZoneId(parentZoneId, pageable)
-                .map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
-    }
-
-    public Page<ZoneResponse> findRootZones(Pageable pageable) {
-        return zoneRepository
-                .findByParentZoneIsNull(pageable)
-                .map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
-    }
-
-    public Page<ZoneResponse> findByName(String name, Pageable pageable) {
-        return zoneRepository
-                .findByNameContainingIgnoreCase(name, pageable)
+                .findAll(CatalogSpecifications.zoneFilter(parentZoneId, rootOnly, name), pageable)
                 .map(zone -> ZoneResponse.from(zone, routeTypesForZone(zone.getId())));
     }
 

@@ -1,5 +1,6 @@
 package com.roberto.climbingwiki.project1.services;
 
+import com.roberto.climbingwiki.project1.repositories.CatalogSpecifications;
 import com.roberto.climbingwiki.project1.dtos.RouteRequest;
 import com.roberto.climbingwiki.project1.dtos.RouteResponse;
 import com.roberto.climbingwiki.project1.exceptions.RouteNotFoundException;
@@ -40,16 +41,11 @@ public class RouteService {
         this.tagRepository = tagRepository;
     }
 
-    public Page<RouteResponse> findAll(Pageable pageable) {
-        return routeRepository.findAll(pageable).map(RouteResponse::from);
-    }
-
-    public Page<RouteResponse> findBySectorId(Long sectorId, Pageable pageable) {
-        return routeRepository.findBySectorId(sectorId, pageable).map(RouteResponse::from);
-    }
-
-    public Page<RouteResponse> findByName(String name, Pageable pageable) {
-        return routeRepository.findByNameContainingIgnoreCase(name, pageable).map(RouteResponse::from);
+    /** Lists routes matching every given filter; null or blank filters are ignored. */
+    public Page<RouteResponse> search(Long sectorId, String name, Pageable pageable) {
+        return routeRepository
+                .findAll(CatalogSpecifications.routeFilter(sectorId, name), pageable)
+                .map(RouteResponse::from);
     }
 
     public RouteResponse findById(Long id) {

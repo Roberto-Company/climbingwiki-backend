@@ -4,16 +4,11 @@ import com.roberto.climbingwiki.project1.model.entities.Route;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
-public interface RouteRepository extends JpaRepository<Route, Long> {
-
-    Page<Route> findBySectorId(Long sectorId, Pageable pageable);
-
-    Page<Route> findByNameContainingIgnoreCase(String name, Pageable pageable);
+public interface RouteRepository extends JpaRepository<Route, Long>, JpaSpecificationExecutor<Route> {
 
     @Query(
             "select distinct r.sector.id as sectorId, r.routeType as routeType "
