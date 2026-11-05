@@ -9,6 +9,7 @@ import com.roberto.climbingwiki.project1.dtos.UserRequest;
 import com.roberto.climbingwiki.project1.dtos.UserResponse;
 import com.roberto.climbingwiki.project1.dtos.VerifyEmailRequest;
 import com.roberto.climbingwiki.project1.exceptions.TooManyLoginAttemptsException;
+import com.roberto.climbingwiki.project1.security.ClientIpResolver;
 import com.roberto.climbingwiki.project1.security.LoginRateLimiterService;
 import com.roberto.climbingwiki.project1.services.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,10 +27,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final LoginRateLimiterService loginRateLimiterService;
+    private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService, LoginRateLimiterService loginRateLimiterService) {
+    public AuthController(
+            AuthService authService,
+            LoginRateLimiterService loginRateLimiterService,
+            ClientIpResolver clientIpResolver) {
         this.authService = authService;
         this.loginRateLimiterService = loginRateLimiterService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/register")
@@ -40,7 +46,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        if (!loginRateLimiterService.tryConsume(httpRequest.getRemoteAddr())) {
+        if (!loginRateLimiterService.tryConsume(clientIpResolver.resolve(httpRequest))) {
             throw new TooManyLoginAttemptsException();
         }
         return authService.login(request);

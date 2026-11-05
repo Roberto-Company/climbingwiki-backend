@@ -1,6 +1,7 @@
 package com.roberto.climbingwiki.project1.controllers;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,6 +14,7 @@ import com.roberto.climbingwiki.project1.exceptions.InvalidCredentialsException;
 import com.roberto.climbingwiki.project1.exceptions.InvalidOrExpiredTokenException;
 import com.roberto.climbingwiki.project1.exceptions.UserNotFoundException;
 import com.roberto.climbingwiki.project1.model.entities.User;
+import com.roberto.climbingwiki.project1.security.ClientIpResolver;
 import com.roberto.climbingwiki.project1.security.LoginRateLimiterService;
 import com.roberto.climbingwiki.project1.services.AuthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +43,12 @@ class AuthControllerTest {
     @MockitoBean
     private LoginRateLimiterService loginRateLimiterService;
 
+    @MockitoBean
+    private ClientIpResolver clientIpResolver;
+
     @BeforeEach
     void allowLoginAttemptsByDefault() {
+        when(clientIpResolver.resolve(any())).thenReturn("198.51.100.7");
         when(loginRateLimiterService.tryConsume(any())).thenReturn(true);
     }
 
@@ -87,6 +93,15 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"alice\",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void login_rateLimitsByResolvedClientIp() throws Exception {
+        when(authService.login(any())).thenReturn(null);
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY));
+
+        verify(loginRateLimiterService).tryConsume("198.51.100.7");
     }
 
     @Test
