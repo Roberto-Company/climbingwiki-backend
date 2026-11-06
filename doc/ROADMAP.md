@@ -10,6 +10,7 @@ Granular bugs and deliberate trade-offs: [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 - **Data rules:** unique pitch order per route (409 on conflict), half-star ratings (0–5 in 0.5 steps), optional per-route coordinates.
 - **Auth:** register/login with JWT (24 h, no refresh), three roles, public reads, authenticated writes, ownership checks on personal data. Email verification and password reset in demo mode (tokens returned/logged, no email sent).
 - **Verified / unverified catalog data:** zones, crags, sectors, routes and pitches record who added them and whether a moderator verified them. Regular users' additions start unverified; they can edit or delete only their own unverified items (delete only when nothing is under them, since deletes cascade). Moderators and admins edit, delete and verify anything. Rules live in one place, `CatalogAccess`.
+- **Moderation:** a review queue of unverified data (`GET /api/moderation/unverified`, up to 100 newest per kind); moderators and admins can delete any comment or photo.
 - **Privacy:** user emails are returned only to the user themselves and admins.
 - **Login rate limit:** 5 attempts per minute per real client IP. `X-Forwarded-For` is trusted only from `TRUSTED_PROXIES`; idle buckets are evicted after 10 minutes.
 - **Lists:** pagination with a `PagedResponse` envelope (max size 100); catalog filters combine (`/routes?sectorId=&name=`, `/crags?zoneId=&name=`, `/zones?parentZoneId=|rootOnly=&name=`) via JPA Specifications.
@@ -19,11 +20,10 @@ Granular bugs and deliberate trade-offs: [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 
 ## Next
 
-1. **Moderation:** list unverified data for review; delete comments and photos from any user.
-2. **Going online safely:** password reset that doesn't show its token (real email on a free provider, or disabled on the demo), no default `JWT_SECRET`, `show-sql` off, CORS for the frontend's address, demo accounts.
-3. **Deploy:** Dockerfile; backend and MySQL on free tiers.
-4. **CI:** GitHub Actions running the test suite.
-5. **README polish:** live link, architecture diagram and screenshots.
+1. **Going online safely:** password reset that doesn't show its token (real email on a free provider, or disabled on the demo), no default `JWT_SECRET`, `show-sql` off, CORS for the frontend's address, demo accounts.
+2. **Deploy:** Dockerfile; backend and MySQL on free tiers.
+3. **CI:** GitHub Actions running the test suite.
+4. **README polish:** live link, architecture diagram and screenshots.
 
 ## If this went to production
 

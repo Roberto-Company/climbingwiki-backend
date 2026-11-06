@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
+                        .requestMatchers("/api/moderation/**").hasAnyRole("MODERATOR", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
                         // Reference data: grade scales are admin-only, tags are curated by moderators.
                         .requestMatchers("/api/grades/**", "/api/grading-systems/**").hasRole("ADMIN")
