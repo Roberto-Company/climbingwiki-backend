@@ -7,9 +7,6 @@ Bugs found and fixed, and gaps left open on purpose. Entries move from Open to R
 - **No pitch renumbering** (2026-06-23)
   `Pitch.orderIndex` is supplied by the client. Inserting a pitch in the middle of a route means updating every later pitch with `PUT`; there is no endpoint that shifts the rest automatically.
 
-- **French grades lack 4a / 4b / 4c** (2026-11-04)
-  `seed/grades.csv` goes `4`, `4+`, `5`, `5a`… Imported 4a and 4c routes were stored as `4` / `4+`. Needs new grade rows and a data fix for the affected routes.
-
 - **No order for routes in a sector** (2026-11-04)
   Routes have no position field, so the left-to-right order from the topo is lost.
 
@@ -31,6 +28,9 @@ Bugs found and fixed, and gaps left open on purpose. Entries move from Open to R
   Map equivalents (French 6a ≈ YDS 5.10a ≈ V3) so a route's grade can be shown in the system the viewer prefers.
 
 ## Resolved
+
+- **Easy French grades didn't follow Spanish topos** (found 2026-11-04, fixed 2026-11-06)
+  The table had 5a/5b/5c (theCrag style) but no 5+. It now uses 3, 4, 4+, 5, 5+, then 6a… Existing pitches moved with `database/alter_french_easy_grades.sql` (5a/5b → 5, 5c → 5+).
 
 - **Catalog filters didn't combine** (found 2026-11-04, fixed 2026-11-05)
   `/routes?sectorId=&name=` used only the first filter. Lists now AND every filter through JPA Specifications.
