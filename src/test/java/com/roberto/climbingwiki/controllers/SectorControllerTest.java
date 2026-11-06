@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.roberto.climbingwiki.exceptions.CatalogItemInUseException;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.SectorResponse;
 import com.roberto.climbingwiki.exceptions.CragNotFoundException;
 import com.roberto.climbingwiki.exceptions.SectorNotFoundException;
@@ -43,7 +45,7 @@ class SectorControllerTest {
     private SectorService sectorService;
 
     private SectorResponse response(Long id, String name) {
-        return new SectorResponse(id, 1L, name, "desc", null, null, Set.of(Route.RouteType.SPORT));
+        return new SectorResponse(id, 1L, name, "desc", null, null, Set.of(Route.RouteType.SPORT), 3L, true);
     }
 
     @Test
@@ -89,7 +91,7 @@ class SectorControllerTest {
 
     @Test
     void create_validRequest_returns201() throws Exception {
-        when(sectorService.create(any())).thenReturn(response(5L, "Pared de Sant Jeroni"));
+        when(sectorService.create(any(), any())).thenReturn(response(5L, "Pared de Sant Jeroni"));
 
         mockMvc.perform(post("/api/sectors").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
@@ -106,7 +108,7 @@ class SectorControllerTest {
 
     @Test
     void create_cragNotFound_returns404() throws Exception {
-        when(sectorService.create(any())).thenThrow(new CragNotFoundException(1L));
+        when(sectorService.create(any(), any())).thenThrow(new CragNotFoundException(1L));
 
         mockMvc.perform(post("/api/sectors").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -114,7 +116,7 @@ class SectorControllerTest {
 
     @Test
     void update_existingSector_returns200() throws Exception {
-        when(sectorService.update(eq(1L), any())).thenReturn(response(1L, "Pared de Sant Jeroni"));
+        when(sectorService.update(eq(1L), any(), any())).thenReturn(response(1L, "Pared de Sant Jeroni"));
 
         mockMvc.perform(put("/api/sectors/1").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isOk());
@@ -122,7 +124,7 @@ class SectorControllerTest {
 
     @Test
     void update_missingSector_returns404() throws Exception {
-        when(sectorService.update(eq(99L), any())).thenThrow(new SectorNotFoundException(99L));
+        when(sectorService.update(eq(99L), any(), any())).thenThrow(new SectorNotFoundException(99L));
 
         mockMvc.perform(put("/api/sectors/99").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -135,8 +137,42 @@ class SectorControllerTest {
 
     @Test
     void delete_missingSector_returns404() throws Exception {
-        doThrow(new SectorNotFoundException(99L)).when(sectorService).delete(99L);
+        doThrow(new SectorNotFoundException(99L)).when(sectorService).delete(eq(99L), any());
 
         mockMvc.perform(delete("/api/sectors/99")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setVerification_validBody_returnsUpdatedItem() throws Exception {
+        when(sectorService.setVerified(eq(1L), eq(true), any())).thenReturn(response(1L, "Pared de Sant Jeroni"));
+
+        mockMvc.perform(put("/api/sectors/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    void setVerification_missingFlag_returns400() throws Exception {
+        mockMvc.perform(put("/api/sectors/1/verification").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setVerification_byRegularUser_returns403() throws Exception {
+        when(sectorService.setVerified(eq(1L), eq(true), any())).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(put("/api/sectors/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delete_itemWithChildData_returns409() throws Exception {
+        doThrow(new CatalogItemInUseException()).when(sectorService).delete(eq(1L), any());
+
+        mockMvc.perform(delete("/api/sectors/1")).andExpect(status().isConflict());
     }
 }

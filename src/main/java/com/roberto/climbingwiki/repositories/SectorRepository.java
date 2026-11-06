@@ -11,4 +11,6 @@ public interface SectorRepository extends JpaRepository<Sector, Long> {
     Page<Sector> findByCragId(Long cragId, Pageable pageable);
 
     Optional<Sector> findByExternalSourceAndExternalId(String externalSource, String externalId);
+
+    boolean existsByCragId(Long cragId);
 }

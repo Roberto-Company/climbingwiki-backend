@@ -254,6 +254,7 @@ public class OpenBetaImportService {
         Zone zone = zoneRepository.findByExternalSourceAndExternalId(EXTERNAL_SOURCE, area.uuid()).orElse(null);
         if (zone == null) {
             zone = new Zone();
+            zone.setVerified(true); // trusted bulk import
             zone.setExternalSource(EXTERNAL_SOURCE);
             zone.setExternalId(area.uuid());
             isNew = true;
@@ -274,6 +275,7 @@ public class OpenBetaImportService {
         Crag crag = cragRepository.findByExternalSourceAndExternalId(EXTERNAL_SOURCE, area.uuid()).orElse(null);
         if (crag == null) {
             crag = new Crag();
+            crag.setVerified(true); // trusted bulk import
             crag.setExternalSource(EXTERNAL_SOURCE);
             crag.setExternalId(area.uuid());
             isNew = true;
@@ -301,6 +303,7 @@ public class OpenBetaImportService {
                 .orElse(null);
         if (sector == null) {
             sector = new Sector();
+            sector.setVerified(true); // trusted bulk import
             sector.setExternalSource(EXTERNAL_SOURCE);
             sector.setExternalId(sectorExternalId);
             isNew = true;
@@ -334,6 +337,7 @@ public class OpenBetaImportService {
                 routeRepository.findByExternalSourceAndExternalId(EXTERNAL_SOURCE, climb.uuid()).orElse(null);
         if (route == null) {
             route = new Route();
+            route.setVerified(true); // trusted bulk import
             route.setExternalSource(EXTERNAL_SOURCE);
             route.setExternalId(climb.uuid());
             isNew = true;

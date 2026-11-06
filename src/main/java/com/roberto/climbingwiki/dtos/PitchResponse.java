@@ -9,7 +9,9 @@ public record PitchResponse(
         Integer orderIndex,
         Integer lengthM,
         Integer boltsCount,
-        String description) {
+        String description,
+        Long createdById,
+        boolean verified) {
 
     public static PitchResponse from(Pitch pitch) {
         return new PitchResponse(
@@ -19,6 +21,8 @@ public record PitchResponse(
                 pitch.getOrderIndex(),
                 pitch.getLengthM(),
                 pitch.getBoltsCount(),
-                pitch.getDescription());
+                pitch.getDescription(),
+                pitch.getCreatedById(),
+                pitch.isVerified());
     }
 }

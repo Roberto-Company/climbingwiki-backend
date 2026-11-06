@@ -24,13 +24,14 @@ public record RouteResponse(
         LocalDateTime updatedAt,
         Set<String> tags,
         Long hardestGradeId,
-        Integer totalLengthM) {
+        Integer totalLengthM,
+        boolean verified) {
 
     public static RouteResponse from(Route route, RouteSummary summary) {
         return new RouteResponse(
                 route.getId(),
                 route.getSector().getId(),
-                route.getCreatedBy() != null ? route.getCreatedBy().getId() : null,
+                route.getCreatedById(),
                 route.getName(),
                 route.getRouteType(),
                 route.getDescription(),
@@ -43,6 +44,7 @@ public record RouteResponse(
                 route.getUpdatedAt(),
                 route.getTags().stream().map(Tag::getName).collect(Collectors.toSet()),
                 summary.hardestGradeId(),
-                summary.totalLengthM());
+                summary.totalLengthM(),
+                route.isVerified());
     }
 }

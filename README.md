@@ -17,7 +17,8 @@ REST API for **ClimbingWiki**, a community wiki and logbook for rock climbing. I
 - **18 resources** under `/api/*`, paginated (`?page=&size=&sort=`, max 100) with a consistent `PagedResponse` envelope.
 - **Combinable filters** on catalog lists (e.g. `/api/routes?sectorId=6&name=marta`), built with JPA Specifications; LIKE wildcards in user input are escaped.
 - **Route summaries:** every route carries its hardest grade and total length, computed for a whole page in one query (no N+1).
-- **Security:** public reads, authenticated writes, ownership checks on personal data (owner, moderator or admin). Emails are visible only to their owner and admins.
+- **Verified and unverified climbing data:** anyone logged in can add zones, crags, sectors, routes and pitches; their additions start **unverified**. Owners can change their own unverified items; moderators and admins can change anything and verify it (`PUT /api/{type}/{id}/verification`). The creator always comes from the login token, never from the request body.
+- **Security:** public reads, authenticated writes, ownership checks on personal data (owner, moderator or admin). Grade scales are admin-only, tags moderator-only. Emails are visible only to their owner and admins.
 - **Login rate limit per real client IP:** `X-Forwarded-For` is trusted only from configured proxies; idle buckets are evicted.
 - **Data import:** grade tables seeded from CSV; crags from OpenStreetMap and routes from theCrag/OpenBeta, upserted by external id so imports can be re-run.
 

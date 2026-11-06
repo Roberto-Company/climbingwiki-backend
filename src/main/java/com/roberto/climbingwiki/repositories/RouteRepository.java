@@ -25,4 +25,6 @@ public interface RouteRepository extends JpaRepository<Route, Long>, JpaSpecific
 
         Route.RouteType getRouteType();
     }
+
+    boolean existsBySectorId(Long sectorId);
 }

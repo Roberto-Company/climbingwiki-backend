@@ -12,7 +12,9 @@ public record SectorResponse(
         String description,
         BigDecimal latitude,
         BigDecimal longitude,
-        Set<Route.RouteType> routeTypes) {
+        Set<Route.RouteType> routeTypes,
+        Long createdById,
+        boolean verified) {
 
     public static SectorResponse from(Sector sector, Set<Route.RouteType> routeTypes) {
         return new SectorResponse(
@@ -22,6 +24,8 @@ public record SectorResponse(
                 sector.getDescription(),
                 sector.getLatitude(),
                 sector.getLongitude(),
-                routeTypes);
+                routeTypes,
+                sector.getCreatedById(),
+                sector.isVerified());
     }
 }

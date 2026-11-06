@@ -18,15 +18,11 @@ import org.hibernate.annotations.CreationTimestamp;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Crag extends BaseEntity {
+public class Crag extends CatalogEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "zone_id")
     private Zone zone;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private User createdBy;
 
     @Column(nullable = false, length = 150)
     private String name;

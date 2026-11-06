@@ -9,7 +9,6 @@ import java.util.Set;
 
 public record RouteRequest(
         @NotNull Long sectorId,
-        Long createdById,
         @NotBlank String name,
         @NotNull Route.RouteType routeType,
         String description,

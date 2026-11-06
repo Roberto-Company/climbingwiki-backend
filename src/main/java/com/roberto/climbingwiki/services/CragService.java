@@ -4,14 +4,13 @@ import com.roberto.climbingwiki.repositories.CatalogSpecifications;
 import com.roberto.climbingwiki.dtos.CragRequest;
 import com.roberto.climbingwiki.dtos.CragResponse;
 import com.roberto.climbingwiki.exceptions.CragNotFoundException;
-import com.roberto.climbingwiki.exceptions.UserNotFoundException;
 import com.roberto.climbingwiki.exceptions.ZoneNotFoundException;
 import com.roberto.climbingwiki.model.entities.Crag;
-import com.roberto.climbingwiki.model.entities.User;
 import com.roberto.climbingwiki.model.entities.Zone;
 import com.roberto.climbingwiki.repositories.CragRepository;
-import com.roberto.climbingwiki.repositories.UserRepository;
+import com.roberto.climbingwiki.repositories.SectorRepository;
 import com.roberto.climbingwiki.repositories.ZoneRepository;
+import com.roberto.climbingwiki.security.AuthenticatedUser;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,12 +21,18 @@ public class CragService {
 
     private final CragRepository cragRepository;
     private final ZoneRepository zoneRepository;
-    private final UserRepository userRepository;
+    private final SectorRepository sectorRepository;
+    private final CatalogAccess access;
 
-    public CragService(CragRepository cragRepository, ZoneRepository zoneRepository, UserRepository userRepository) {
+    public CragService(
+            CragRepository cragRepository,
+            ZoneRepository zoneRepository,
+            SectorRepository sectorRepository,
+            CatalogAccess access) {
         this.cragRepository = cragRepository;
         this.zoneRepository = zoneRepository;
-        this.userRepository = userRepository;
+        this.sectorRepository = sectorRepository;
+        this.access = access;
     }
 
     /** Lists crags matching every given filter; null or blank filters are ignored. */
@@ -44,25 +49,38 @@ public class CragService {
     }
 
     @Transactional
-    public CragResponse create(CragRequest request) {
+    public CragResponse create(CragRequest request, AuthenticatedUser requester) {
         Crag crag = new Crag();
+        access.stampCreation(crag, requester);
         applyRequest(crag, request);
         return CragResponse.from(cragRepository.save(crag));
     }
 
     @Transactional
-    public CragResponse update(Long id, CragRequest request) {
-        Crag crag = cragRepository.findById(id).orElseThrow(() -> new CragNotFoundException(id));
+    public CragResponse update(Long id, CragRequest request, AuthenticatedUser requester) {
+        Crag crag = getCrag(id);
+        access.checkCanEdit(crag, requester);
         applyRequest(crag, request);
         return CragResponse.from(cragRepository.save(crag));
     }
 
     @Transactional
-    public void delete(Long id) {
-        if (!cragRepository.existsById(id)) {
-            throw new CragNotFoundException(id);
-        }
+    public void delete(Long id, AuthenticatedUser requester) {
+        Crag crag = getCrag(id);
+        access.checkCanDelete(crag, requester, sectorRepository.existsByCragId(id));
         cragRepository.deleteById(id);
+    }
+
+    @Transactional
+    public CragResponse setVerified(Long id, boolean verified, AuthenticatedUser requester) {
+        Crag crag = getCrag(id);
+        access.setVerified(crag, verified, requester);
+        Crag saved = cragRepository.save(crag);
+        return CragResponse.from(saved);
+    }
+
+    private Crag getCrag(Long id) {
+        return cragRepository.findById(id).orElseThrow(() -> new CragNotFoundException(id));
     }
 
     private void applyRequest(Crag crag, CragRequest request) {
@@ -72,14 +90,6 @@ public class CragService {
             crag.setZone(zone);
         } else {
             crag.setZone(null);
-        }
-
-        if (request.createdById() != null) {
-            User createdBy = userRepository.findById(request.createdById())
-                    .orElseThrow(() -> new UserNotFoundException(request.createdById()));
-            crag.setCreatedBy(createdBy);
-        } else {
-            crag.setCreatedBy(null);
         }
 
         crag.setName(request.name());

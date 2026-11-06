@@ -29,6 +29,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+                        // Reference data: grade scales are admin-only, tags are curated by moderators.
+                        .requestMatchers("/api/grades/**", "/api/grading-systems/**").hasRole("ADMIN")
+                        .requestMatchers("/api/tags/**").hasAnyRole("MODERATOR", "ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
         return http.build();

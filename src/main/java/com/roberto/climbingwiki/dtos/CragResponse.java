@@ -16,13 +16,14 @@ public record CragResponse(
         String orientation,
         String rockType,
         String approachDescription,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        boolean verified) {
 
     public static CragResponse from(Crag crag) {
         return new CragResponse(
                 crag.getId(),
                 crag.getZone() != null ? crag.getZone().getId() : null,
-                crag.getCreatedBy() != null ? crag.getCreatedBy().getId() : null,
+                crag.getCreatedById(),
                 crag.getName(),
                 crag.getDescription(),
                 crag.getLatitude(),
@@ -31,6 +32,7 @@ public record CragResponse(
                 crag.getOrientation(),
                 crag.getRockType(),
                 crag.getApproachDescription(),
-                crag.getCreatedAt());
+                crag.getCreatedAt(),
+                crag.isVerified());
     }
 }

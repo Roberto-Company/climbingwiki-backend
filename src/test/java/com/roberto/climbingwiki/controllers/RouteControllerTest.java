@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.roberto.climbingwiki.exceptions.CatalogItemInUseException;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.RouteResponse;
 import com.roberto.climbingwiki.exceptions.RouteNotFoundException;
 import com.roberto.climbingwiki.exceptions.SectorNotFoundException;
@@ -48,7 +50,7 @@ class RouteControllerTest {
     private RouteResponse response(Long id, String name) {
         return new RouteResponse(
                 id, 1L, null, name, Route.RouteType.SPORT, "desc", "notes", "John Doe", null, null, null, null, null,
-                Set.of("classic"), 12L, 45);
+                Set.of("classic"), 12L, 45, true);
     }
 
     @Test
@@ -104,7 +106,7 @@ class RouteControllerTest {
 
     @Test
     void create_validRequest_returns201() throws Exception {
-        when(routeService.create(any())).thenReturn(response(5L, "La Rambla"));
+        when(routeService.create(any(), any())).thenReturn(response(5L, "La Rambla"));
 
         mockMvc.perform(post("/api/routes").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
@@ -121,7 +123,7 @@ class RouteControllerTest {
 
     @Test
     void create_sectorNotFound_returns404() throws Exception {
-        when(routeService.create(any())).thenThrow(new SectorNotFoundException(1L));
+        when(routeService.create(any(), any())).thenThrow(new SectorNotFoundException(1L));
 
         mockMvc.perform(post("/api/routes").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -129,7 +131,7 @@ class RouteControllerTest {
 
     @Test
     void update_existingRoute_returns200() throws Exception {
-        when(routeService.update(eq(1L), any())).thenReturn(response(1L, "La Rambla"));
+        when(routeService.update(eq(1L), any(), any())).thenReturn(response(1L, "La Rambla"));
 
         mockMvc.perform(put("/api/routes/1").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isOk());
@@ -137,7 +139,7 @@ class RouteControllerTest {
 
     @Test
     void update_missingRoute_returns404() throws Exception {
-        when(routeService.update(eq(99L), any())).thenThrow(new RouteNotFoundException(99L));
+        when(routeService.update(eq(99L), any(), any())).thenThrow(new RouteNotFoundException(99L));
 
         mockMvc.perform(put("/api/routes/99").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -150,8 +152,42 @@ class RouteControllerTest {
 
     @Test
     void delete_missingRoute_returns404() throws Exception {
-        doThrow(new RouteNotFoundException(99L)).when(routeService).delete(99L);
+        doThrow(new RouteNotFoundException(99L)).when(routeService).delete(eq(99L), any());
 
         mockMvc.perform(delete("/api/routes/99")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setVerification_validBody_returnsUpdatedItem() throws Exception {
+        when(routeService.setVerified(eq(1L), eq(true), any())).thenReturn(response(1L, "La Rambla"));
+
+        mockMvc.perform(put("/api/routes/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    void setVerification_missingFlag_returns400() throws Exception {
+        mockMvc.perform(put("/api/routes/1/verification").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setVerification_byRegularUser_returns403() throws Exception {
+        when(routeService.setVerified(eq(1L), eq(true), any())).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(put("/api/routes/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delete_itemWithChildData_returns409() throws Exception {
+        doThrow(new CatalogItemInUseException()).when(routeService).delete(eq(1L), any());
+
+        mockMvc.perform(delete("/api/routes/1")).andExpect(status().isConflict());
     }
 }

@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.roberto.climbingwiki.exceptions.CatalogItemInUseException;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.ZoneResponse;
 import com.roberto.climbingwiki.exceptions.InvalidZoneParentException;
 import com.roberto.climbingwiki.exceptions.ZoneNotFoundException;
@@ -44,7 +46,7 @@ class ZoneControllerTest {
     private ZoneService zoneService;
 
     private ZoneResponse response(Long id, String name) {
-        return new ZoneResponse(id, null, name, "desc", Set.of(Route.RouteType.SPORT));
+        return new ZoneResponse(id, null, name, "desc", Set.of(Route.RouteType.SPORT), 3L, true);
     }
 
     @Test
@@ -108,7 +110,7 @@ class ZoneControllerTest {
 
     @Test
     void create_validRequest_returns201() throws Exception {
-        when(zoneService.create(any())).thenReturn(response(5L, "Montserrat"));
+        when(zoneService.create(any(), any())).thenReturn(response(5L, "Montserrat"));
 
         mockMvc.perform(post("/api/zones").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
@@ -126,7 +128,7 @@ class ZoneControllerTest {
 
     @Test
     void update_existingZone_returns200() throws Exception {
-        when(zoneService.update(eq(1L), any())).thenReturn(response(1L, "Montserrat"));
+        when(zoneService.update(eq(1L), any(), any())).thenReturn(response(1L, "Montserrat"));
 
         mockMvc.perform(put("/api/zones/1").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isOk())
@@ -135,7 +137,7 @@ class ZoneControllerTest {
 
     @Test
     void update_missingZone_returns404() throws Exception {
-        when(zoneService.update(eq(99L), any())).thenThrow(new ZoneNotFoundException(99L));
+        when(zoneService.update(eq(99L), any(), any())).thenThrow(new ZoneNotFoundException(99L));
 
         mockMvc.perform(put("/api/zones/99").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -143,7 +145,7 @@ class ZoneControllerTest {
 
     @Test
     void update_selfAsParent_returns400() throws Exception {
-        when(zoneService.update(eq(1L), any())).thenThrow(new InvalidZoneParentException(1L));
+        when(zoneService.update(eq(1L), any(), any())).thenThrow(new InvalidZoneParentException(1L));
 
         mockMvc.perform(put("/api/zones/1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,8 +160,42 @@ class ZoneControllerTest {
 
     @Test
     void delete_missingZone_returns404() throws Exception {
-        doThrow(new ZoneNotFoundException(99L)).when(zoneService).delete(99L);
+        doThrow(new ZoneNotFoundException(99L)).when(zoneService).delete(eq(99L), any());
 
         mockMvc.perform(delete("/api/zones/99")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setVerification_validBody_returnsUpdatedItem() throws Exception {
+        when(zoneService.setVerified(eq(1L), eq(true), any())).thenReturn(response(1L, "Montserrat"));
+
+        mockMvc.perform(put("/api/zones/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    void setVerification_missingFlag_returns400() throws Exception {
+        mockMvc.perform(put("/api/zones/1/verification").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setVerification_byRegularUser_returns403() throws Exception {
+        when(zoneService.setVerified(eq(1L), eq(true), any())).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(put("/api/zones/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delete_itemWithChildData_returns409() throws Exception {
+        doThrow(new CatalogItemInUseException()).when(zoneService).delete(eq(1L), any());
+
+        mockMvc.perform(delete("/api/zones/1")).andExpect(status().isConflict());
     }
 }

@@ -26,7 +26,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Route extends BaseEntity {
+public class Route extends CatalogEntity {
 
     public enum RouteType {
         SPORT,
@@ -37,10 +37,6 @@ public class Route extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sector_id", nullable = false)
     private Sector sector;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private User createdBy;
 
     @Column(nullable = false, length = 150)
     private String name;
