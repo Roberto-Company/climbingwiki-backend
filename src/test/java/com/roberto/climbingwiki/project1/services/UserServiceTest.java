@@ -63,29 +63,100 @@ class UserServiceTest {
         return new AuthenticatedUser(id, "boss", User.Role.ADMIN);
     }
 
+    private AuthenticatedUser moderator(Long id) {
+        return new AuthenticatedUser(id, "mod", User.Role.MODERATOR);
+    }
+
     @Test
     void findAll_returnsMappedResponses() {
         when(userRepository.findAll()).thenReturn(List.of(user(1L, "jane", "jane@example.com")));
 
-        List<UserResponse> result = userService.findAll();
+        List<UserResponse> result = userService.findAll(null);
 
         assertThat(result).extracting(UserResponse::username).containsExactly("jane");
+    }
+
+    @Test
+    void findAll_anonymousViewer_hidesEveryEmail() {
+        when(userRepository.findAll()).thenReturn(
+                List.of(user(1L, "jane", "jane@example.com"), user(2L, "bob", "bob@example.com")));
+
+        List<UserResponse> result = userService.findAll(null);
+
+        assertThat(result).extracting(UserResponse::email).containsOnlyNulls();
+    }
+
+    @Test
+    void findAll_regularUser_seesOnlyOwnEmail() {
+        when(userRepository.findAll()).thenReturn(
+                List.of(user(1L, "jane", "jane@example.com"), user(2L, "bob", "bob@example.com")));
+
+        List<UserResponse> result = userService.findAll(self(1L));
+
+        assertThat(result).extracting(UserResponse::email).containsExactly("jane@example.com", null);
+    }
+
+    @Test
+    void findAll_moderator_doesNotSeeOtherUsersEmails() {
+        when(userRepository.findAll()).thenReturn(List.of(user(1L, "jane", "jane@example.com")));
+
+        List<UserResponse> result = userService.findAll(moderator(5L));
+
+        assertThat(result).extracting(UserResponse::email).containsOnlyNulls();
+    }
+
+    @Test
+    void findAll_admin_seesEveryEmail() {
+        when(userRepository.findAll()).thenReturn(
+                List.of(user(1L, "jane", "jane@example.com"), user(2L, "bob", "bob@example.com")));
+
+        List<UserResponse> result = userService.findAll(admin(99L));
+
+        assertThat(result).extracting(UserResponse::email).containsExactly("jane@example.com", "bob@example.com");
     }
 
     @Test
     void findById_existingUser_returnsResponse() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "jane", "jane@example.com")));
 
-        UserResponse result = userService.findById(1L);
+        UserResponse result = userService.findById(1L, null);
 
         assertThat(result.username()).isEqualTo("jane");
+    }
+
+    @Test
+    void findById_anonymousViewer_hidesEmail() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "jane", "jane@example.com")));
+
+        assertThat(userService.findById(1L, null).email()).isNull();
+    }
+
+    @Test
+    void findById_anotherRegularUser_hidesEmail() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "jane", "jane@example.com")));
+
+        assertThat(userService.findById(1L, self(2L)).email()).isNull();
+    }
+
+    @Test
+    void findById_self_showsEmail() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "jane", "jane@example.com")));
+
+        assertThat(userService.findById(1L, self(1L)).email()).isEqualTo("jane@example.com");
+    }
+
+    @Test
+    void findById_admin_showsEmail() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "jane", "jane@example.com")));
+
+        assertThat(userService.findById(1L, admin(99L)).email()).isEqualTo("jane@example.com");
     }
 
     @Test
     void findById_missingUser_throws() {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.findById(99L))
+        assertThatThrownBy(() -> userService.findById(99L, null))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessageContaining("99");
     }
@@ -166,6 +237,7 @@ class UserServiceTest {
                 userService.update(1L, request("jane", "jane@example.com", "newpassword", null), self(1L));
 
         assertThat(result.username()).isEqualTo("jane");
+        assertThat(result.email()).isEqualTo("jane@example.com");
     }
 
     @Test
