@@ -18,13 +18,12 @@ Granular bugs and deliberate trade-offs: [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 
 ## Next
 
-1. **Grade table fix:** add French 4a/4b/4c and correct routes stored as `4` / `4+`.
-2. **Flyway** so `schema.sql` and its upgrades apply automatically.
-3. **One-command run:** Dockerfile and a full-stack `docker compose up` with seeded data and demo accounts.
-4. **Integration tests** with Testcontainers (MySQL), including the full register → login → write flow.
-5. **CI:** GitHub Actions running the test suite.
-6. **Light production settings:** no default `JWT_SECRET` outside a dev profile, `show-sql` off, CORS configuration.
-7. **README polish:** architecture diagram and screenshots.
+1. **Flyway** so `schema.sql` and its upgrades apply automatically.
+2. **One-command run:** Dockerfile and a full-stack `docker compose up` with seeded data and demo accounts.
+3. **Integration tests** with Testcontainers (MySQL), including the full register → login → write flow.
+4. **CI:** GitHub Actions running the test suite.
+5. **Light production settings:** no default `JWT_SECRET` outside a dev profile, `show-sql` off, CORS configuration.
+6. **README polish:** architecture diagram and screenshots.
 
 ## If this went to production
 
