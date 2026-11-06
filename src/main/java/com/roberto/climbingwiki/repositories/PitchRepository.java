@@ -24,4 +24,6 @@ public interface PitchRepository extends JpaRepository<Pitch, Long> {
             where p.route.id in :routeIds
             """)
     List<PitchSummaryRow> findSummaryRows(@Param("routeIds") Collection<Long> routeIds);
+
+    boolean existsByRouteId(Long routeId);
 }

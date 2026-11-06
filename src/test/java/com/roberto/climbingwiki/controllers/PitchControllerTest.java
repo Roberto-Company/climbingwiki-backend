@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.roberto.climbingwiki.exceptions.CatalogItemInUseException;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.PitchResponse;
 import com.roberto.climbingwiki.exceptions.PitchNotFoundException;
 import com.roberto.climbingwiki.exceptions.PitchOrderConflictException;
@@ -44,7 +46,7 @@ class PitchControllerTest {
     private PitchService pitchService;
 
     private PitchResponse response(Long id, Integer orderIndex) {
-        return new PitchResponse(id, 1L, null, orderIndex, 25, 8, "crux on top");
+        return new PitchResponse(id, 1L, null, orderIndex, 25, 8, "crux on top", 3L, true);
     }
 
     @Test
@@ -90,7 +92,7 @@ class PitchControllerTest {
 
     @Test
     void create_validRequest_returns201() throws Exception {
-        when(pitchService.create(any())).thenReturn(response(5L, 1));
+        when(pitchService.create(any(), any())).thenReturn(response(5L, 1));
 
         mockMvc.perform(post("/api/pitches").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
@@ -107,7 +109,7 @@ class PitchControllerTest {
 
     @Test
     void create_routeNotFound_returns404() throws Exception {
-        when(pitchService.create(any())).thenThrow(new RouteNotFoundException(1L));
+        when(pitchService.create(any(), any())).thenThrow(new RouteNotFoundException(1L));
 
         mockMvc.perform(post("/api/pitches").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -115,7 +117,7 @@ class PitchControllerTest {
 
     @Test
     void create_duplicateOrderIndex_returns409() throws Exception {
-        when(pitchService.create(any())).thenThrow(new PitchOrderConflictException(1L, 1));
+        when(pitchService.create(any(), any())).thenThrow(new PitchOrderConflictException(1L, 1));
 
         mockMvc.perform(post("/api/pitches").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isConflict());
@@ -123,7 +125,7 @@ class PitchControllerTest {
 
     @Test
     void update_existingPitch_returns200() throws Exception {
-        when(pitchService.update(eq(1L), any())).thenReturn(response(1L, 1));
+        when(pitchService.update(eq(1L), any(), any())).thenReturn(response(1L, 1));
 
         mockMvc.perform(put("/api/pitches/1").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isOk());
@@ -131,7 +133,7 @@ class PitchControllerTest {
 
     @Test
     void update_missingPitch_returns404() throws Exception {
-        when(pitchService.update(eq(99L), any())).thenThrow(new PitchNotFoundException(99L));
+        when(pitchService.update(eq(99L), any(), any())).thenThrow(new PitchNotFoundException(99L));
 
         mockMvc.perform(put("/api/pitches/99").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -144,8 +146,42 @@ class PitchControllerTest {
 
     @Test
     void delete_missingPitch_returns404() throws Exception {
-        doThrow(new PitchNotFoundException(99L)).when(pitchService).delete(99L);
+        doThrow(new PitchNotFoundException(99L)).when(pitchService).delete(eq(99L), any());
 
         mockMvc.perform(delete("/api/pitches/99")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setVerification_validBody_returnsUpdatedItem() throws Exception {
+        when(pitchService.setVerified(eq(1L), eq(true), any())).thenReturn(response(1L, 1));
+
+        mockMvc.perform(put("/api/pitches/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    void setVerification_missingFlag_returns400() throws Exception {
+        mockMvc.perform(put("/api/pitches/1/verification").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setVerification_byRegularUser_returns403() throws Exception {
+        when(pitchService.setVerified(eq(1L), eq(true), any())).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(put("/api/pitches/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delete_itemWithChildData_returns409() throws Exception {
+        doThrow(new CatalogItemInUseException()).when(pitchService).delete(eq(1L), any());
+
+        mockMvc.perform(delete("/api/pitches/1")).andExpect(status().isConflict());
     }
 }

@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface CragRepository extends JpaRepository<Crag, Long>, JpaSpecificationExecutor<Crag> {
 
     Optional<Crag> findByExternalSourceAndExternalId(String externalSource, String externalId);
+
+    boolean existsByZoneId(Long zoneId);
 }

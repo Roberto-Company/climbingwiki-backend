@@ -9,6 +9,7 @@ import com.roberto.climbingwiki.model.entities.Route;
 import com.roberto.climbingwiki.model.entities.Sector;
 import com.roberto.climbingwiki.repositories.CragRepository;
 import com.roberto.climbingwiki.repositories.RouteRepository;
+import com.roberto.climbingwiki.security.AuthenticatedUser;
 import com.roberto.climbingwiki.repositories.SectorRepository;
 import java.util.List;
 import java.util.Map;
@@ -25,12 +26,17 @@ public class SectorService {
     private final SectorRepository sectorRepository;
     private final CragRepository cragRepository;
     private final RouteRepository routeRepository;
+    private final CatalogAccess access;
 
     public SectorService(
-            SectorRepository sectorRepository, CragRepository cragRepository, RouteRepository routeRepository) {
+            SectorRepository sectorRepository,
+            CragRepository cragRepository,
+            RouteRepository routeRepository,
+            CatalogAccess access) {
         this.sectorRepository = sectorRepository;
         this.cragRepository = cragRepository;
         this.routeRepository = routeRepository;
+        this.access = access;
     }
 
     public Page<SectorResponse> findAll(Pageable pageable) {
@@ -55,15 +61,17 @@ public class SectorService {
     }
 
     @Transactional
-    public SectorResponse create(SectorRequest request) {
+    public SectorResponse create(SectorRequest request, AuthenticatedUser requester) {
         Sector sector = new Sector();
+        access.stampCreation(sector, requester);
         applyRequest(sector, request);
         return SectorResponse.from(sectorRepository.save(sector), Set.of());
     }
 
     @Transactional
-    public SectorResponse update(Long id, SectorRequest request) {
-        Sector sector = sectorRepository.findById(id).orElseThrow(() -> new SectorNotFoundException(id));
+    public SectorResponse update(Long id, SectorRequest request, AuthenticatedUser requester) {
+        Sector sector = getSector(id);
+        access.checkCanEdit(sector, requester);
         applyRequest(sector, request);
         Sector saved = sectorRepository.save(sector);
         Set<Route.RouteType> routeTypes = routeTypesBySectorIds(List.of(id)).getOrDefault(id, Set.of());
@@ -71,11 +79,22 @@ public class SectorService {
     }
 
     @Transactional
-    public void delete(Long id) {
-        if (!sectorRepository.existsById(id)) {
-            throw new SectorNotFoundException(id);
-        }
+    public void delete(Long id, AuthenticatedUser requester) {
+        Sector sector = getSector(id);
+        access.checkCanDelete(sector, requester, routeRepository.existsBySectorId(id));
         sectorRepository.deleteById(id);
+    }
+
+    @Transactional
+    public SectorResponse setVerified(Long id, boolean verified, AuthenticatedUser requester) {
+        Sector sector = getSector(id);
+        access.setVerified(sector, verified, requester);
+        Sector saved = sectorRepository.save(sector);
+        return SectorResponse.from(saved, routeTypesBySectorIds(List.of(id)).getOrDefault(id, Set.of()));
+    }
+
+    private Sector getSector(Long id) {
+        return sectorRepository.findById(id).orElseThrow(() -> new SectorNotFoundException(id));
     }
 
     private void applyRequest(Sector sector, SectorRequest request) {

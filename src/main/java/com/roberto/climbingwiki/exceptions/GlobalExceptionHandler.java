@@ -24,7 +24,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({PitchOrderConflictException.class, UserConflictException.class,
-            GradingSystemConflictException.class, GradeConflictException.class})
+            GradingSystemConflictException.class, GradeConflictException.class,
+            CatalogItemInUseException.class})
     public ResponseEntity<ApiError> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(ex.getMessage()));
     }

@@ -16,7 +16,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Sector extends BaseEntity {
+public class Sector extends CatalogEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "crag_id", nullable = false)

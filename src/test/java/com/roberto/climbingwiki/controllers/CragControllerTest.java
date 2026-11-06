@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.roberto.climbingwiki.exceptions.CatalogItemInUseException;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.CragResponse;
 import com.roberto.climbingwiki.exceptions.CragNotFoundException;
 import com.roberto.climbingwiki.services.CragService;
@@ -43,7 +45,7 @@ class CragControllerTest {
     private CragService cragService;
 
     private CragResponse response(Long id, String name) {
-        return new CragResponse(id, null, null, name, "desc", null, null, null, "S", "limestone", "approach", null);
+        return new CragResponse(id, null, 3L, name, "desc", null, null, null, "S", "limestone", "approach", null, true);
     }
 
     @Test
@@ -96,7 +98,7 @@ class CragControllerTest {
 
     @Test
     void create_validRequest_returns201() throws Exception {
-        when(cragService.create(any())).thenReturn(response(5L, "Montserrat"));
+        when(cragService.create(any(), any())).thenReturn(response(5L, "Montserrat"));
 
         mockMvc.perform(post("/api/crags").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
@@ -114,7 +116,7 @@ class CragControllerTest {
 
     @Test
     void update_existingCrag_returns200() throws Exception {
-        when(cragService.update(eq(1L), any())).thenReturn(response(1L, "Montserrat"));
+        when(cragService.update(eq(1L), any(), any())).thenReturn(response(1L, "Montserrat"));
 
         mockMvc.perform(put("/api/crags/1").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isOk())
@@ -123,7 +125,7 @@ class CragControllerTest {
 
     @Test
     void update_missingCrag_returns404() throws Exception {
-        when(cragService.update(eq(99L), any())).thenThrow(new CragNotFoundException(99L));
+        when(cragService.update(eq(99L), any(), any())).thenThrow(new CragNotFoundException(99L));
 
         mockMvc.perform(put("/api/crags/99").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isNotFound());
@@ -136,8 +138,42 @@ class CragControllerTest {
 
     @Test
     void delete_missingCrag_returns404() throws Exception {
-        doThrow(new CragNotFoundException(99L)).when(cragService).delete(99L);
+        doThrow(new CragNotFoundException(99L)).when(cragService).delete(eq(99L), any());
 
         mockMvc.perform(delete("/api/crags/99")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setVerification_validBody_returnsUpdatedItem() throws Exception {
+        when(cragService.setVerified(eq(1L), eq(true), any())).thenReturn(response(1L, "Montserrat"));
+
+        mockMvc.perform(put("/api/crags/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    void setVerification_missingFlag_returns400() throws Exception {
+        mockMvc.perform(put("/api/crags/1/verification").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setVerification_byRegularUser_returns403() throws Exception {
+        when(cragService.setVerified(eq(1L), eq(true), any())).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(put("/api/crags/1/verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verified\":true}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void delete_itemWithChildData_returns409() throws Exception {
+        doThrow(new CatalogItemInUseException()).when(cragService).delete(eq(1L), any());
+
+        mockMvc.perform(delete("/api/crags/1")).andExpect(status().isConflict());
     }
 }

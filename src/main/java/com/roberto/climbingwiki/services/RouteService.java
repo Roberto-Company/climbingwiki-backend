@@ -6,17 +6,15 @@ import com.roberto.climbingwiki.dtos.RouteResponse;
 import com.roberto.climbingwiki.exceptions.RouteNotFoundException;
 import com.roberto.climbingwiki.exceptions.SectorNotFoundException;
 import com.roberto.climbingwiki.exceptions.TagNotFoundException;
-import com.roberto.climbingwiki.exceptions.UserNotFoundException;
 import com.roberto.climbingwiki.model.entities.Route;
 import com.roberto.climbingwiki.model.entities.Sector;
 import com.roberto.climbingwiki.model.entities.Tag;
-import com.roberto.climbingwiki.model.entities.User;
 import com.roberto.climbingwiki.dtos.RouteSummary;
 import com.roberto.climbingwiki.repositories.PitchRepository;
 import com.roberto.climbingwiki.repositories.RouteRepository;
 import com.roberto.climbingwiki.repositories.SectorRepository;
 import com.roberto.climbingwiki.repositories.TagRepository;
-import com.roberto.climbingwiki.repositories.UserRepository;
+import com.roberto.climbingwiki.security.AuthenticatedUser;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,21 +29,21 @@ public class RouteService {
 
     private final RouteRepository routeRepository;
     private final SectorRepository sectorRepository;
-    private final UserRepository userRepository;
     private final TagRepository tagRepository;
     private final PitchRepository pitchRepository;
+    private final CatalogAccess access;
 
     public RouteService(
             RouteRepository routeRepository,
             SectorRepository sectorRepository,
-            UserRepository userRepository,
             TagRepository tagRepository,
-            PitchRepository pitchRepository) {
+            PitchRepository pitchRepository,
+            CatalogAccess access) {
         this.routeRepository = routeRepository;
         this.sectorRepository = sectorRepository;
-        this.userRepository = userRepository;
         this.tagRepository = tagRepository;
         this.pitchRepository = pitchRepository;
+        this.access = access;
     }
 
     /** Lists routes matching every given filter; null or blank filters are ignored. */
@@ -62,25 +60,38 @@ public class RouteService {
     }
 
     @Transactional
-    public RouteResponse create(RouteRequest request) {
+    public RouteResponse create(RouteRequest request, AuthenticatedUser requester) {
         Route route = new Route();
+        access.stampCreation(route, requester);
         applyRequest(route, request);
         return RouteResponse.from(routeRepository.save(route), RouteSummary.EMPTY);
     }
 
     @Transactional
-    public RouteResponse update(Long id, RouteRequest request) {
-        Route route = routeRepository.findById(id).orElseThrow(() -> new RouteNotFoundException(id));
+    public RouteResponse update(Long id, RouteRequest request, AuthenticatedUser requester) {
+        Route route = getRoute(id);
+        access.checkCanEdit(route, requester);
         applyRequest(route, request);
         return toResponse(routeRepository.save(route));
     }
 
     @Transactional
-    public void delete(Long id) {
-        if (!routeRepository.existsById(id)) {
-            throw new RouteNotFoundException(id);
-        }
+    public void delete(Long id, AuthenticatedUser requester) {
+        Route route = getRoute(id);
+        access.checkCanDelete(route, requester, pitchRepository.existsByRouteId(id));
         routeRepository.deleteById(id);
+    }
+
+    @Transactional
+    public RouteResponse setVerified(Long id, boolean verified, AuthenticatedUser requester) {
+        Route route = getRoute(id);
+        access.setVerified(route, verified, requester);
+        Route saved = routeRepository.save(route);
+        return toResponse(saved);
+    }
+
+    private Route getRoute(Long id) {
+        return routeRepository.findById(id).orElseThrow(() -> new RouteNotFoundException(id));
     }
 
     /** One query for the pitches of all given routes, instead of one per route. */
@@ -103,14 +114,6 @@ public class RouteService {
         Sector sector = sectorRepository.findById(request.sectorId())
                 .orElseThrow(() -> new SectorNotFoundException(request.sectorId()));
         route.setSector(sector);
-
-        if (request.createdById() != null) {
-            User createdBy = userRepository.findById(request.createdById())
-                    .orElseThrow(() -> new UserNotFoundException(request.createdById()));
-            route.setCreatedBy(createdBy);
-        } else {
-            route.setCreatedBy(null);
-        }
 
         route.setName(request.name());
         route.setRouteType(request.routeType());

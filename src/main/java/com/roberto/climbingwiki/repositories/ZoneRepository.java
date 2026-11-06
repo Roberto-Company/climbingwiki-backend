@@ -11,4 +11,6 @@ public interface ZoneRepository extends JpaRepository<Zone, Long>, JpaSpecificat
     List<Zone> findByParentZoneId(Long parentZoneId);
 
     Optional<Zone> findByExternalSourceAndExternalId(String externalSource, String externalId);
+
+    boolean existsByParentZoneId(Long parentZoneId);
 }

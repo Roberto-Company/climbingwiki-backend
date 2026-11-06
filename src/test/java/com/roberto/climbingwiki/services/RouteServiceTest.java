@@ -1,6 +1,8 @@
 package com.roberto.climbingwiki.services;
 
 import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,12 +11,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.roberto.climbingwiki.security.AuthenticatedUser;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.RouteRequest;
 import com.roberto.climbingwiki.dtos.RouteResponse;
 import com.roberto.climbingwiki.exceptions.RouteNotFoundException;
 import com.roberto.climbingwiki.exceptions.SectorNotFoundException;
 import com.roberto.climbingwiki.exceptions.TagNotFoundException;
-import com.roberto.climbingwiki.exceptions.UserNotFoundException;
 import com.roberto.climbingwiki.model.entities.Route;
 import com.roberto.climbingwiki.model.entities.Sector;
 import com.roberto.climbingwiki.model.entities.Tag;
@@ -24,7 +27,6 @@ import com.roberto.climbingwiki.repositories.PitchSummaryRow;
 import com.roberto.climbingwiki.repositories.RouteRepository;
 import com.roberto.climbingwiki.repositories.SectorRepository;
 import com.roberto.climbingwiki.repositories.TagRepository;
-import com.roberto.climbingwiki.repositories.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -41,14 +43,17 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class RouteServiceTest {
 
+    private static final AuthenticatedUser REQUESTER =
+            new AuthenticatedUser(1L, "climber", User.Role.USER);
+
+    @Mock
+    private CatalogAccess access;
+
     @Mock
     private RouteRepository routeRepository;
 
     @Mock
     private SectorRepository sectorRepository;
-
-    @Mock
-    private UserRepository userRepository;
 
     @Mock
     private TagRepository tagRepository;
@@ -60,7 +65,7 @@ class RouteServiceTest {
 
     @BeforeEach
     void setUp() {
-        routeService = new RouteService(routeRepository, sectorRepository, userRepository, tagRepository, pitchRepository);
+        routeService = new RouteService(routeRepository, sectorRepository, tagRepository, pitchRepository, access);
     }
 
     private Sector sector(Long id) {
@@ -78,8 +83,8 @@ class RouteServiceTest {
         return route;
     }
 
-    private RouteRequest request(Long sectorId, Long createdById, Set<Long> tagIds) {
-        return new RouteRequest(sectorId, createdById, "La Rambla", Route.RouteType.SPORT, "desc", "notes",
+    private RouteRequest request(Long sectorId, Set<Long> tagIds) {
+        return new RouteRequest(sectorId, "La Rambla", Route.RouteType.SPORT, "desc", "notes",
                 "John Doe", null, null, null, tagIds);
     }
 
@@ -154,49 +159,37 @@ class RouteServiceTest {
     void create_missingSector_throws() {
         when(sectorRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> routeService.create(request(1L, null, null)))
+        assertThatThrownBy(() -> routeService.create(request(1L, null), REQUESTER))
                 .isInstanceOf(SectorNotFoundException.class)
                 .hasMessageContaining("1");
     }
 
-    @Test
-    void create_missingCreatedBy_throws() {
-        when(sectorRepository.findById(1L)).thenReturn(Optional.of(sector(1L)));
-        when(userRepository.findById(5L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> routeService.create(request(1L, 5L, null)))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("5");
-    }
 
     @Test
     void create_missingTag_throws() {
         when(sectorRepository.findById(1L)).thenReturn(Optional.of(sector(1L)));
         when(tagRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(new Tag()));
 
-        assertThatThrownBy(() -> routeService.create(request(1L, null, Set.of(1L, 2L))))
+        assertThatThrownBy(() -> routeService.create(request(1L, Set.of(1L, 2L)), REQUESTER))
                 .isInstanceOf(TagNotFoundException.class);
     }
 
     @Test
-    void create_withValidSectorUserAndTags_savesRoute() {
+    void create_withValidSectorAndTags_savesRouteAndStampsCreator() {
         Sector sector = sector(1L);
-        User user = new User();
-        user.setId(5L);
         Tag tag = new Tag();
         tag.setId(1L);
         tag.setName("classic");
 
         when(sectorRepository.findById(1L)).thenReturn(Optional.of(sector));
-        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
         when(tagRepository.findAllById(Set.of(1L))).thenReturn(List.of(tag));
         when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RouteResponse result = routeService.create(request(1L, 5L, Set.of(1L)));
+        RouteResponse result = routeService.create(request(1L, Set.of(1L)), REQUESTER);
 
         assertThat(result.name()).isEqualTo("La Rambla");
         assertThat(result.sectorId()).isEqualTo(1L);
-        assertThat(result.createdById()).isEqualTo(5L);
+        verify(access).stampCreation(any(Route.class), eq(REQUESTER));
         assertThat(result.tags()).containsExactly("classic");
     }
 
@@ -205,7 +198,7 @@ class RouteServiceTest {
         when(sectorRepository.findById(1L)).thenReturn(Optional.of(sector(1L)));
         when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RouteResponse result = routeService.create(request(1L, null, null));
+        RouteResponse result = routeService.create(request(1L, null), REQUESTER);
 
         assertThat(result.tags()).isEmpty();
         verify(tagRepository, never()).findAllById(any());
@@ -218,7 +211,7 @@ class RouteServiceTest {
         when(sectorRepository.findById(1L)).thenReturn(Optional.of(sector(1L)));
         when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RouteResponse result = routeService.update(1L, request(1L, null, null));
+        RouteResponse result = routeService.update(1L, request(1L, null), REQUESTER);
 
         assertThat(result.name()).isEqualTo("La Rambla");
     }
@@ -227,25 +220,80 @@ class RouteServiceTest {
     void update_missingRoute_throws() {
         when(routeRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> routeService.update(99L, request(1L, null, null)))
+        assertThatThrownBy(() -> routeService.update(99L, request(1L, null), REQUESTER))
                 .isInstanceOf(RouteNotFoundException.class);
     }
 
     @Test
     void delete_existingRoute_deletes() {
-        when(routeRepository.existsById(1L)).thenReturn(true);
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(new Route()));
 
-        routeService.delete(1L);
+        routeService.delete(1L, REQUESTER);
 
         verify(routeRepository).deleteById(1L);
     }
 
     @Test
     void delete_missingRoute_throwsAndDoesNotDelete() {
-        when(routeRepository.existsById(99L)).thenReturn(false);
+        when(routeRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> routeService.delete(99L)).isInstanceOf(RouteNotFoundException.class);
+        assertThatThrownBy(() -> routeService.delete(99L, REQUESTER)).isInstanceOf(RouteNotFoundException.class);
 
         verify(routeRepository, never()).deleteById(99L);
+    }
+
+    // ----- access rules (CatalogAccess is mocked; its own rules are covered by CatalogAccessTest)
+
+    @Test
+    void update_whenAccessDenied_throwsAndDoesNotSave() {
+        Route existing = new Route();
+        existing.setId(1L);
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanEdit(existing, REQUESTER);
+
+        assertThatThrownBy(() -> routeService.update(1L, request(1L, null), REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(routeRepository, never()).save(any());
+    }
+
+    @Test
+    void delete_passesChildDataFlagToAccessRules() {
+        Route existing = new Route();
+        existing.setId(1L);
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(pitchRepository.existsByRouteId(1L)).thenReturn(true);
+
+        routeService.delete(1L, REQUESTER);
+
+        verify(access).checkCanDelete(existing, REQUESTER, true);
+        verify(routeRepository).deleteById(1L);
+    }
+
+    @Test
+    void delete_whenAccessDenied_doesNotDelete() {
+        Route existing = new Route();
+        existing.setId(1L);
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanDelete(any(), eq(REQUESTER), anyBoolean());
+
+        assertThatThrownBy(() -> routeService.delete(1L, REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(routeRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void setVerified_appliesAccessRulesAndSaves() {
+        Route existing = new Route();
+        existing.setId(1L);
+        Sector parent = new Sector();
+        parent.setId(9L);
+        existing.setSector(parent);
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(routeRepository.save(existing)).thenReturn(existing);
+
+        routeService.setVerified(1L, true, REQUESTER);
+
+        verify(access).setVerified(existing, true, REQUESTER);
+        verify(routeRepository).save(existing);
     }
 }

@@ -1,6 +1,8 @@
 package com.roberto.climbingwiki.services;
 
 import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,16 +11,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.roberto.climbingwiki.security.AuthenticatedUser;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.CragRequest;
 import com.roberto.climbingwiki.dtos.CragResponse;
 import com.roberto.climbingwiki.exceptions.CragNotFoundException;
-import com.roberto.climbingwiki.exceptions.UserNotFoundException;
 import com.roberto.climbingwiki.exceptions.ZoneNotFoundException;
 import com.roberto.climbingwiki.model.entities.Crag;
 import com.roberto.climbingwiki.model.entities.User;
 import com.roberto.climbingwiki.model.entities.Zone;
+import com.roberto.climbingwiki.repositories.SectorRepository;
 import com.roberto.climbingwiki.repositories.CragRepository;
-import com.roberto.climbingwiki.repositories.UserRepository;
 import com.roberto.climbingwiki.repositories.ZoneRepository;
 import java.util.List;
 import java.util.Optional;
@@ -35,20 +38,26 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class CragServiceTest {
 
+    private static final AuthenticatedUser REQUESTER =
+            new AuthenticatedUser(1L, "climber", User.Role.USER);
+
+    @Mock
+    private CatalogAccess access;
+
+    @Mock
+    private SectorRepository sectorRepository;
+
     @Mock
     private CragRepository cragRepository;
 
     @Mock
     private ZoneRepository zoneRepository;
 
-    @Mock
-    private UserRepository userRepository;
-
     private CragService cragService;
 
     @BeforeEach
     void setUp() {
-        cragService = new CragService(cragRepository, zoneRepository, userRepository);
+        cragService = new CragService(cragRepository, zoneRepository, sectorRepository, access);
     }
 
     private Crag crag(Long id, String name) {
@@ -58,9 +67,9 @@ class CragServiceTest {
         return crag;
     }
 
-    private CragRequest request(Long zoneId, Long createdById) {
+    private CragRequest request(Long zoneId) {
         return new CragRequest(
-                zoneId, createdById, "Montserrat", "desc", null, null, null, "S", "limestone", "approach");
+                zoneId, "Montserrat", "desc", null, null, null, "S", "limestone", "approach");
     }
 
     @Test
@@ -94,15 +103,14 @@ class CragServiceTest {
     }
 
     @Test
-    void create_withoutZoneOrCreator_savesWithNullAssociations() {
+    void create_withoutZone_savesWithoutZoneAndStampsCreator() {
         when(cragRepository.save(any(Crag.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CragResponse result = cragService.create(request(null, null));
+        CragResponse result = cragService.create(request(null), REQUESTER);
 
         assertThat(result.zoneId()).isNull();
-        assertThat(result.createdById()).isNull();
         verify(zoneRepository, never()).findById(any());
-        verify(userRepository, never()).findById(any());
+        verify(access).stampCreation(any(Crag.class), eq(REQUESTER));
     }
 
     @Test
@@ -112,7 +120,7 @@ class CragServiceTest {
         when(zoneRepository.findById(7L)).thenReturn(Optional.of(zone));
         when(cragRepository.save(any(Crag.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CragResponse result = cragService.create(request(7L, null));
+        CragResponse result = cragService.create(request(7L), REQUESTER);
 
         assertThat(result.zoneId()).isEqualTo(7L);
     }
@@ -121,19 +129,11 @@ class CragServiceTest {
     void create_withMissingZoneId_throws() {
         when(zoneRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cragService.create(request(7L, null)))
+        assertThatThrownBy(() -> cragService.create(request(7L), REQUESTER))
                 .isInstanceOf(ZoneNotFoundException.class)
                 .hasMessageContaining("7");
     }
 
-    @Test
-    void create_withMissingCreatedById_throws() {
-        when(userRepository.findById(3L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> cragService.create(request(null, 3L)))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("3");
-    }
 
     @Test
     void update_existingCrag_appliesChanges() {
@@ -141,7 +141,7 @@ class CragServiceTest {
         when(cragRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(cragRepository.save(any(Crag.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CragResponse result = cragService.update(1L, request(null, null));
+        CragResponse result = cragService.update(1L, request(null), REQUESTER);
 
         assertThat(result.name()).isEqualTo("Montserrat");
     }
@@ -150,25 +150,77 @@ class CragServiceTest {
     void update_missingCrag_throws() {
         when(cragRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cragService.update(99L, request(null, null)))
+        assertThatThrownBy(() -> cragService.update(99L, request(null), REQUESTER))
                 .isInstanceOf(CragNotFoundException.class);
     }
 
     @Test
     void delete_existingCrag_deletes() {
-        when(cragRepository.existsById(1L)).thenReturn(true);
+        when(cragRepository.findById(1L)).thenReturn(Optional.of(new Crag()));
 
-        cragService.delete(1L);
+        cragService.delete(1L, REQUESTER);
 
         verify(cragRepository).deleteById(1L);
     }
 
     @Test
     void delete_missingCrag_throwsAndDoesNotDelete() {
-        when(cragRepository.existsById(99L)).thenReturn(false);
+        when(cragRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> cragService.delete(99L)).isInstanceOf(CragNotFoundException.class);
+        assertThatThrownBy(() -> cragService.delete(99L, REQUESTER)).isInstanceOf(CragNotFoundException.class);
 
         verify(cragRepository, never()).deleteById(99L);
+    }
+
+    // ----- access rules (CatalogAccess is mocked; its own rules are covered by CatalogAccessTest)
+
+    @Test
+    void update_whenAccessDenied_throwsAndDoesNotSave() {
+        Crag existing = new Crag();
+        existing.setId(1L);
+        when(cragRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanEdit(existing, REQUESTER);
+
+        assertThatThrownBy(() -> cragService.update(1L, request(null), REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(cragRepository, never()).save(any());
+    }
+
+    @Test
+    void delete_passesChildDataFlagToAccessRules() {
+        Crag existing = new Crag();
+        existing.setId(1L);
+        when(cragRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(sectorRepository.existsByCragId(1L)).thenReturn(true);
+
+        cragService.delete(1L, REQUESTER);
+
+        verify(access).checkCanDelete(existing, REQUESTER, true);
+        verify(cragRepository).deleteById(1L);
+    }
+
+    @Test
+    void delete_whenAccessDenied_doesNotDelete() {
+        Crag existing = new Crag();
+        existing.setId(1L);
+        when(cragRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanDelete(any(), eq(REQUESTER), anyBoolean());
+
+        assertThatThrownBy(() -> cragService.delete(1L, REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(cragRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void setVerified_appliesAccessRulesAndSaves() {
+        Crag existing = new Crag();
+        existing.setId(1L);
+        when(cragRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(cragRepository.save(existing)).thenReturn(existing);
+
+        cragService.setVerified(1L, true, REQUESTER);
+
+        verify(access).setVerified(existing, true, REQUESTER);
+        verify(cragRepository).save(existing);
     }
 }

@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 
 public record CragRequest(
         Long zoneId,
-        Long createdById,
         @NotBlank String name,
         String description,
         BigDecimal latitude,

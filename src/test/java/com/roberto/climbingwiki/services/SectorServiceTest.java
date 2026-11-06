@@ -1,5 +1,8 @@
 package com.roberto.climbingwiki.services;
 
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -7,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.roberto.climbingwiki.security.AuthenticatedUser;
+import com.roberto.climbingwiki.model.entities.User;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.SectorRequest;
 import com.roberto.climbingwiki.dtos.SectorResponse;
 import com.roberto.climbingwiki.exceptions.CragNotFoundException;
@@ -32,6 +38,12 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class SectorServiceTest {
 
+    private static final AuthenticatedUser REQUESTER =
+            new AuthenticatedUser(1L, "climber", User.Role.USER);
+
+    @Mock
+    private CatalogAccess access;
+
     @Mock
     private SectorRepository sectorRepository;
 
@@ -45,7 +57,7 @@ class SectorServiceTest {
 
     @BeforeEach
     void setUp() {
-        sectorService = new SectorService(sectorRepository, cragRepository, routeRepository);
+        sectorService = new SectorService(sectorRepository, cragRepository, routeRepository, access);
     }
 
     private RouteRepository.SectorRouteType routeTypeRow(Long sectorId, Route.RouteType type) {
@@ -158,7 +170,7 @@ class SectorServiceTest {
         when(cragRepository.findById(1L)).thenReturn(Optional.of(crag(1L)));
         when(sectorRepository.save(any(Sector.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SectorResponse result = sectorService.create(new SectorRequest(1L, "New Sector", "desc", null, null));
+        SectorResponse result = sectorService.create(new SectorRequest(1L, "New Sector", "desc", null, null), REQUESTER);
 
         assertThat(result.name()).isEqualTo("New Sector");
         assertThat(result.cragId()).isEqualTo(1L);
@@ -168,7 +180,7 @@ class SectorServiceTest {
     void create_missingCrag_throws() {
         when(cragRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sectorService.create(new SectorRequest(99L, "New Sector", "desc", null, null)))
+        assertThatThrownBy(() -> sectorService.create(new SectorRequest(99L, "New Sector", "desc", null, null), REQUESTER))
                 .isInstanceOf(CragNotFoundException.class)
                 .hasMessageContaining("99");
     }
@@ -180,7 +192,7 @@ class SectorServiceTest {
         when(cragRepository.findById(1L)).thenReturn(Optional.of(crag(1L)));
         when(sectorRepository.save(any(Sector.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        SectorResponse result = sectorService.update(1L, new SectorRequest(1L, "New name", "desc", null, null));
+        SectorResponse result = sectorService.update(1L, new SectorRequest(1L, "New name", "desc", null, null), REQUESTER);
 
         assertThat(result.name()).isEqualTo("New name");
     }
@@ -189,25 +201,80 @@ class SectorServiceTest {
     void update_missingSector_throws() {
         when(sectorRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sectorService.update(99L, new SectorRequest(1L, "name", "desc", null, null)))
+        assertThatThrownBy(() -> sectorService.update(99L, new SectorRequest(1L, "name", "desc", null, null), REQUESTER))
                 .isInstanceOf(SectorNotFoundException.class);
     }
 
     @Test
     void delete_existingSector_deletes() {
-        when(sectorRepository.existsById(1L)).thenReturn(true);
+        when(sectorRepository.findById(1L)).thenReturn(Optional.of(new Sector()));
 
-        sectorService.delete(1L);
+        sectorService.delete(1L, REQUESTER);
 
         verify(sectorRepository).deleteById(1L);
     }
 
     @Test
     void delete_missingSector_throwsAndDoesNotDelete() {
-        when(sectorRepository.existsById(99L)).thenReturn(false);
+        when(sectorRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sectorService.delete(99L)).isInstanceOf(SectorNotFoundException.class);
+        assertThatThrownBy(() -> sectorService.delete(99L, REQUESTER)).isInstanceOf(SectorNotFoundException.class);
 
         verify(sectorRepository, never()).deleteById(99L);
+    }
+
+    // ----- access rules (CatalogAccess is mocked; its own rules are covered by CatalogAccessTest)
+
+    @Test
+    void update_whenAccessDenied_throwsAndDoesNotSave() {
+        Sector existing = new Sector();
+        existing.setId(1L);
+        when(sectorRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanEdit(existing, REQUESTER);
+
+        assertThatThrownBy(() -> sectorService.update(1L, new SectorRequest(1L, "New name", "desc", null, null), REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(sectorRepository, never()).save(any());
+    }
+
+    @Test
+    void delete_passesChildDataFlagToAccessRules() {
+        Sector existing = new Sector();
+        existing.setId(1L);
+        when(sectorRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(routeRepository.existsBySectorId(1L)).thenReturn(true);
+
+        sectorService.delete(1L, REQUESTER);
+
+        verify(access).checkCanDelete(existing, REQUESTER, true);
+        verify(sectorRepository).deleteById(1L);
+    }
+
+    @Test
+    void delete_whenAccessDenied_doesNotDelete() {
+        Sector existing = new Sector();
+        existing.setId(1L);
+        when(sectorRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanDelete(any(), eq(REQUESTER), anyBoolean());
+
+        assertThatThrownBy(() -> sectorService.delete(1L, REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(sectorRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void setVerified_appliesAccessRulesAndSaves() {
+        Sector existing = new Sector();
+        existing.setId(1L);
+        Crag parent = new Crag();
+        parent.setId(9L);
+        existing.setCrag(parent);
+        when(sectorRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(sectorRepository.save(existing)).thenReturn(existing);
+
+        sectorService.setVerified(1L, true, REQUESTER);
+
+        verify(access).setVerified(existing, true, REQUESTER);
+        verify(sectorRepository).save(existing);
     }
 }

@@ -1,6 +1,8 @@
 package com.roberto.climbingwiki.services;
 
 import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,12 +11,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.roberto.climbingwiki.security.AuthenticatedUser;
+import com.roberto.climbingwiki.model.entities.User;
+import com.roberto.climbingwiki.exceptions.ForbiddenException;
 import com.roberto.climbingwiki.dtos.ZoneRequest;
 import com.roberto.climbingwiki.dtos.ZoneResponse;
 import com.roberto.climbingwiki.exceptions.InvalidZoneParentException;
 import com.roberto.climbingwiki.exceptions.ZoneNotFoundException;
 import com.roberto.climbingwiki.model.entities.Route;
 import com.roberto.climbingwiki.model.entities.Zone;
+import com.roberto.climbingwiki.repositories.CragRepository;
 import com.roberto.climbingwiki.repositories.RouteRepository;
 import com.roberto.climbingwiki.repositories.ZoneRepository;
 import java.util.List;
@@ -33,6 +39,15 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 class ZoneServiceTest {
 
+    private static final AuthenticatedUser REQUESTER =
+            new AuthenticatedUser(1L, "climber", User.Role.USER);
+
+    @Mock
+    private CatalogAccess access;
+
+    @Mock
+    private CragRepository cragRepository;
+
     @Mock
     private ZoneRepository zoneRepository;
 
@@ -43,7 +58,7 @@ class ZoneServiceTest {
 
     @BeforeEach
     void setUp() {
-        zoneService = new ZoneService(zoneRepository, routeRepository);
+        zoneService = new ZoneService(zoneRepository, routeRepository, cragRepository, access);
     }
 
     private Zone zone(Long id, String name) {
@@ -124,7 +139,7 @@ class ZoneServiceTest {
     void create_withoutParent_savesWithNullParent() {
         when(zoneRepository.save(any(Zone.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ZoneResponse result = zoneService.create(request(null));
+        ZoneResponse result = zoneService.create(request(null), REQUESTER);
 
         assertThat(result.parentZoneId()).isNull();
         verify(zoneRepository, never()).findById(any());
@@ -136,7 +151,7 @@ class ZoneServiceTest {
         when(zoneRepository.findById(7L)).thenReturn(Optional.of(parent));
         when(zoneRepository.save(any(Zone.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ZoneResponse result = zoneService.create(request(7L));
+        ZoneResponse result = zoneService.create(request(7L), REQUESTER);
 
         assertThat(result.parentZoneId()).isEqualTo(7L);
     }
@@ -145,7 +160,7 @@ class ZoneServiceTest {
     void create_withMissingParentId_throws() {
         when(zoneRepository.findById(7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> zoneService.create(request(7L)))
+        assertThatThrownBy(() -> zoneService.create(request(7L), REQUESTER))
                 .isInstanceOf(ZoneNotFoundException.class)
                 .hasMessageContaining("7");
     }
@@ -156,7 +171,7 @@ class ZoneServiceTest {
         when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(zoneRepository.save(any(Zone.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ZoneResponse result = zoneService.update(1L, request(null));
+        ZoneResponse result = zoneService.update(1L, request(null), REQUESTER);
 
         assertThat(result.name()).isEqualTo("Montserrat");
     }
@@ -165,7 +180,7 @@ class ZoneServiceTest {
     void update_missingZone_throws() {
         when(zoneRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> zoneService.update(99L, request(null)))
+        assertThatThrownBy(() -> zoneService.update(99L, request(null), REQUESTER))
                 .isInstanceOf(ZoneNotFoundException.class);
     }
 
@@ -174,7 +189,7 @@ class ZoneServiceTest {
         Zone existing = zone(1L, "Montserrat");
         when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
 
-        assertThatThrownBy(() -> zoneService.update(1L, request(1L)))
+        assertThatThrownBy(() -> zoneService.update(1L, request(1L), REQUESTER))
                 .isInstanceOf(InvalidZoneParentException.class)
                 .hasMessageContaining("1");
 
@@ -183,19 +198,71 @@ class ZoneServiceTest {
 
     @Test
     void delete_existingZone_deletes() {
-        when(zoneRepository.existsById(1L)).thenReturn(true);
+        when(zoneRepository.findById(1L)).thenReturn(Optional.of(new Zone()));
 
-        zoneService.delete(1L);
+        zoneService.delete(1L, REQUESTER);
 
         verify(zoneRepository).deleteById(1L);
     }
 
     @Test
     void delete_missingZone_throwsAndDoesNotDelete() {
-        when(zoneRepository.existsById(99L)).thenReturn(false);
+        when(zoneRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> zoneService.delete(99L)).isInstanceOf(ZoneNotFoundException.class);
+        assertThatThrownBy(() -> zoneService.delete(99L, REQUESTER)).isInstanceOf(ZoneNotFoundException.class);
 
         verify(zoneRepository, never()).deleteById(99L);
+    }
+
+    // ----- access rules (CatalogAccess is mocked; its own rules are covered by CatalogAccessTest)
+
+    @Test
+    void update_whenAccessDenied_throwsAndDoesNotSave() {
+        Zone existing = new Zone();
+        existing.setId(1L);
+        when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanEdit(existing, REQUESTER);
+
+        assertThatThrownBy(() -> zoneService.update(1L, request(null), REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(zoneRepository, never()).save(any());
+    }
+
+    @Test
+    void delete_passesChildDataFlagToAccessRules() {
+        Zone existing = new Zone();
+        existing.setId(1L);
+        when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(cragRepository.existsByZoneId(1L)).thenReturn(true);
+
+        zoneService.delete(1L, REQUESTER);
+
+        verify(access).checkCanDelete(existing, REQUESTER, true);
+        verify(zoneRepository).deleteById(1L);
+    }
+
+    @Test
+    void delete_whenAccessDenied_doesNotDelete() {
+        Zone existing = new Zone();
+        existing.setId(1L);
+        when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
+        doThrow(new ForbiddenException()).when(access).checkCanDelete(any(), eq(REQUESTER), anyBoolean());
+
+        assertThatThrownBy(() -> zoneService.delete(1L, REQUESTER)).isInstanceOf(ForbiddenException.class);
+
+        verify(zoneRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void setVerified_appliesAccessRulesAndSaves() {
+        Zone existing = new Zone();
+        existing.setId(1L);
+        when(zoneRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(zoneRepository.save(existing)).thenReturn(existing);
+
+        zoneService.setVerified(1L, true, REQUESTER);
+
+        verify(access).setVerified(existing, true, REQUESTER);
+        verify(zoneRepository).save(existing);
     }
 }

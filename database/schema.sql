@@ -31,11 +31,14 @@ CREATE TABLE users (
 CREATE TABLE zones (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     parent_zone_id  BIGINT UNSIGNED NULL,
+    created_by      BIGINT UNSIGNED NULL,
     name            VARCHAR(150) NOT NULL,
     description     TEXT,
     external_source VARCHAR(50) NULL,
     external_id     VARCHAR(100) NULL,
+    verified        BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_zones_parent FOREIGN KEY (parent_zone_id) REFERENCES zones (id) ON DELETE SET NULL,
+    CONSTRAINT fk_zones_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
     UNIQUE KEY uq_zones_external (external_source, external_id)
 ) ENGINE=InnoDB;
 
@@ -54,6 +57,7 @@ CREATE TABLE crags (
     external_source       VARCHAR(50) NULL,
     external_id           VARCHAR(100) NULL,
     created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    verified              BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_crags_zone FOREIGN KEY (zone_id) REFERENCES zones (id) ON DELETE SET NULL,
     CONSTRAINT fk_crags_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
     UNIQUE KEY uq_crags_external (external_source, external_id)
@@ -62,13 +66,16 @@ CREATE TABLE crags (
 CREATE TABLE sectors (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     crag_id         BIGINT UNSIGNED NOT NULL,
+    created_by      BIGINT UNSIGNED NULL,
     name            VARCHAR(150) NOT NULL,
     description     TEXT,
     latitude        DECIMAL(10, 7),
     longitude       DECIMAL(10, 7),
     external_source VARCHAR(50) NULL,
     external_id     VARCHAR(100) NULL,
+    verified        BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_sectors_crag FOREIGN KEY (crag_id) REFERENCES crags (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sectors_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
     UNIQUE KEY uq_sectors_external (external_source, external_id)
 ) ENGINE=InnoDB;
 
@@ -107,6 +114,7 @@ CREATE TABLE routes (
     external_id        VARCHAR(100) NULL,
     created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    verified           BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_routes_sector FOREIGN KEY (sector_id) REFERENCES sectors (id) ON DELETE CASCADE,
     CONSTRAINT fk_routes_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
     UNIQUE KEY uq_routes_external (external_source, external_id)
@@ -116,11 +124,14 @@ CREATE TABLE pitches (
     id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     route_id     BIGINT UNSIGNED NOT NULL,
     grade_id     BIGINT UNSIGNED NULL,
+    created_by   BIGINT UNSIGNED NULL,
     order_index  SMALLINT NOT NULL,
     length_m     SMALLINT,
     bolts_count  SMALLINT,
     description  TEXT,
+    verified     BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_pitches_route FOREIGN KEY (route_id) REFERENCES routes (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pitches_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_pitches_grade FOREIGN KEY (grade_id) REFERENCES grades (id) ON DELETE SET NULL,
     UNIQUE (route_id, order_index)
 ) ENGINE=InnoDB;

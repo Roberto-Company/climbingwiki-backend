@@ -19,6 +19,12 @@ Bugs found and fixed, and gaps left open on purpose. Entries move from Open to R
 - **`forgot-password` reveals whether an email exists** (2026-06-25)
   404 vs 200. Acceptable for a portfolio project; listed under "If this went to production" in the roadmap.
 
+- **Import accounts are regular users** (2026-11-06)
+  `osm-importer` and `data-importer` have the `USER` role, so anything the import scripts add from now on starts unverified. Give them `MODERATOR` before re-running an import.
+
+- **Owner deletes of routes don't check personal data** (2026-11-06)
+  An owner can delete their own unverified route when it has no pitches, even if someone logged it or commented on it; those entries go with it (cascade). Rare, since unverified routes are new.
+
 ## Future ideas
 
 - **Roles table instead of a single enum column** (2026-06-24)
@@ -28,6 +34,9 @@ Bugs found and fixed, and gaps left open on purpose. Entries move from Open to R
   Map equivalents (French 6a ≈ YDS 5.10a ≈ V3) so a route's grade can be shown in the system the viewer prefers.
 
 ## Resolved
+
+- **Any logged-in user could edit or delete any climbing data** (found and fixed 2026-11-06)
+  Catalog writes only required a login, and `createdById` was taken from the request body, so anyone could claim to be someone else. Now the creator comes from the token and `CatalogAccess` enforces owner/moderator rules. Grade and grading-system writes are admin-only and tag writes moderator-only.
 
 - **Easy French grades didn't follow Spanish topos** (found 2026-11-04, fixed 2026-11-06)
   The table had 5a/5b/5c (theCrag style) but no 5+. It now uses 3, 4, 4+, 5, 5+, then 6a… Existing pitches moved with `database/alter_french_easy_grades.sql` (5a/5b → 5, 5c → 5+).
