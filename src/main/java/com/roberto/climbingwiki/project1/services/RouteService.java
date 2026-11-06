@@ -11,11 +11,15 @@ import com.roberto.climbingwiki.project1.model.entities.Route;
 import com.roberto.climbingwiki.project1.model.entities.Sector;
 import com.roberto.climbingwiki.project1.model.entities.Tag;
 import com.roberto.climbingwiki.project1.model.entities.User;
+import com.roberto.climbingwiki.project1.dtos.RouteSummary;
+import com.roberto.climbingwiki.project1.repositories.PitchRepository;
 import com.roberto.climbingwiki.project1.repositories.RouteRepository;
 import com.roberto.climbingwiki.project1.repositories.SectorRepository;
 import com.roberto.climbingwiki.project1.repositories.TagRepository;
 import com.roberto.climbingwiki.project1.repositories.UserRepository;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,28 +33,31 @@ public class RouteService {
     private final SectorRepository sectorRepository;
     private final UserRepository userRepository;
     private final TagRepository tagRepository;
+    private final PitchRepository pitchRepository;
 
     public RouteService(
             RouteRepository routeRepository,
             SectorRepository sectorRepository,
             UserRepository userRepository,
-            TagRepository tagRepository) {
+            TagRepository tagRepository,
+            PitchRepository pitchRepository) {
         this.routeRepository = routeRepository;
         this.sectorRepository = sectorRepository;
         this.userRepository = userRepository;
         this.tagRepository = tagRepository;
+        this.pitchRepository = pitchRepository;
     }
 
     /** Lists routes matching every given filter; null or blank filters are ignored. */
     public Page<RouteResponse> search(Long sectorId, String name, Pageable pageable) {
-        return routeRepository
-                .findAll(CatalogSpecifications.routeFilter(sectorId, name), pageable)
-                .map(RouteResponse::from);
+        Page<Route> routes = routeRepository.findAll(CatalogSpecifications.routeFilter(sectorId, name), pageable);
+        Map<Long, RouteSummary> summaries = summarize(routes.getContent());
+        return routes.map(route -> toResponse(route, summaries));
     }
 
     public RouteResponse findById(Long id) {
         return routeRepository.findById(id)
-                .map(RouteResponse::from)
+                .map(this::toResponse)
                 .orElseThrow(() -> new RouteNotFoundException(id));
     }
 
@@ -58,14 +65,14 @@ public class RouteService {
     public RouteResponse create(RouteRequest request) {
         Route route = new Route();
         applyRequest(route, request);
-        return RouteResponse.from(routeRepository.save(route));
+        return RouteResponse.from(routeRepository.save(route), RouteSummary.EMPTY);
     }
 
     @Transactional
     public RouteResponse update(Long id, RouteRequest request) {
         Route route = routeRepository.findById(id).orElseThrow(() -> new RouteNotFoundException(id));
         applyRequest(route, request);
-        return RouteResponse.from(routeRepository.save(route));
+        return toResponse(routeRepository.save(route));
     }
 
     @Transactional
@@ -74,6 +81,22 @@ public class RouteService {
             throw new RouteNotFoundException(id);
         }
         routeRepository.deleteById(id);
+    }
+
+    /** One query for the pitches of all given routes, instead of one per route. */
+    private Map<Long, RouteSummary> summarize(List<Route> routes) {
+        if (routes.isEmpty()) {
+            return Map.of();
+        }
+        return RouteSummary.byRoute(pitchRepository.findSummaryRows(routes.stream().map(Route::getId).toList()));
+    }
+
+    private RouteResponse toResponse(Route route) {
+        return toResponse(route, summarize(List.of(route)));
+    }
+
+    private static RouteResponse toResponse(Route route, Map<Long, RouteSummary> summaries) {
+        return RouteResponse.from(route, summaries.getOrDefault(route.getId(), RouteSummary.EMPTY));
     }
 
     private void applyRequest(Route route, RouteRequest request) {

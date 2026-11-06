@@ -19,6 +19,8 @@ import com.roberto.climbingwiki.project1.model.entities.Route;
 import com.roberto.climbingwiki.project1.model.entities.Sector;
 import com.roberto.climbingwiki.project1.model.entities.Tag;
 import com.roberto.climbingwiki.project1.model.entities.User;
+import com.roberto.climbingwiki.project1.repositories.PitchRepository;
+import com.roberto.climbingwiki.project1.repositories.PitchSummaryRow;
 import com.roberto.climbingwiki.project1.repositories.RouteRepository;
 import com.roberto.climbingwiki.project1.repositories.SectorRepository;
 import com.roberto.climbingwiki.project1.repositories.TagRepository;
@@ -51,11 +53,14 @@ class RouteServiceTest {
     @Mock
     private TagRepository tagRepository;
 
+    @Mock
+    private PitchRepository pitchRepository;
+
     private RouteService routeService;
 
     @BeforeEach
     void setUp() {
-        routeService = new RouteService(routeRepository, sectorRepository, userRepository, tagRepository);
+        routeService = new RouteService(routeRepository, sectorRepository, userRepository, tagRepository, pitchRepository);
     }
 
     private Sector sector(Long id) {
@@ -91,6 +96,40 @@ class RouteServiceTest {
 
         assertThat(result.getContent()).extracting(RouteResponse::name).containsExactly("La Rambla", "Bla");
         assertThat(result.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    void search_includesHardestGradeAndTotalLength_withOneSummaryQueryPerPage() {
+        Sector sector = sector(1L);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Route> routePage = new PageImpl<>(
+                List.of(route(1L, sector, "La Rambla"), route(2L, sector, "Bla")), pageable, 2);
+        when(routeRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Route>>any(), eq(pageable)))
+                .thenReturn(routePage);
+        when(pitchRepository.findSummaryRows(List.of(1L, 2L))).thenReturn(List.of(
+                new PitchSummaryRow(1L, 10L, 50, 20),
+                new PitchSummaryRow(1L, 12L, 70, 25)));
+
+        Page<RouteResponse> result = routeService.search(null, null, pageable);
+
+        RouteResponse rambla = result.getContent().get(0);
+        RouteResponse bla = result.getContent().get(1);
+        assertThat(rambla.hardestGradeId()).isEqualTo(12L);
+        assertThat(rambla.totalLengthM()).isEqualTo(45);
+        assertThat(bla.hardestGradeId()).isNull();
+        assertThat(bla.totalLengthM()).isNull();
+        verify(pitchRepository).findSummaryRows(List.of(1L, 2L));
+    }
+
+    @Test
+    void findById_includesRouteSummary() {
+        when(routeRepository.findById(1L)).thenReturn(Optional.of(route(1L, sector(1L), "La Rambla")));
+        when(pitchRepository.findSummaryRows(List.of(1L))).thenReturn(List.of(new PitchSummaryRow(1L, 12L, 70, 25)));
+
+        RouteResponse result = routeService.findById(1L);
+
+        assertThat(result.hardestGradeId()).isEqualTo(12L);
+        assertThat(result.totalLengthM()).isEqualTo(25);
     }
 
     @Test
