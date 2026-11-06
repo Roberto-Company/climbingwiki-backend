@@ -8,11 +8,11 @@
         <version>4.1.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.roberto.climbingWiki</groupId>
-    <artifactId>project1</artifactId>
+    <groupId>com.roberto</groupId>
+    <artifactId>climbingwiki</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>project1</name>
-    <description>project1</description>
+    <name>ClimbingWiki</name>
+    <description>ClimbingWiki REST API: climbing zones, crags, sectors, routes and climber logbooks</description>
     <url/>
     <licenses>
         <license/>
