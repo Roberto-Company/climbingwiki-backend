@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.controllers;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -48,7 +50,7 @@ class ZoneControllerTest {
     @Test
     void list_returnsAllZones() throws Exception {
         Page<ZoneResponse> page = new PageImpl<>(List.of(response(1L, "Montserrat"), response(2L, "Siurana")));
-        when(zoneService.findAll(any())).thenReturn(page);
+        when(zoneService.search(isNull(), eq(false), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/zones"))
                 .andExpect(status().isOk())
@@ -59,7 +61,7 @@ class ZoneControllerTest {
     @Test
     void list_withParentZoneId_filtersByParent() throws Exception {
         Page<ZoneResponse> page = new PageImpl<>(List.of(response(2L, "Sant Jeroni")));
-        when(zoneService.findByParentZoneId(eq(1L), any())).thenReturn(page);
+        when(zoneService.search(eq(1L), eq(false), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/zones").param("parentZoneId", "1"))
                 .andExpect(status().isOk())
@@ -70,12 +72,22 @@ class ZoneControllerTest {
     @Test
     void list_withRootOnly_returnsRootZones() throws Exception {
         Page<ZoneResponse> page = new PageImpl<>(List.of(response(1L, "Montserrat")));
-        when(zoneService.findRootZones(any())).thenReturn(page);
+        when(zoneService.search(isNull(), eq(true), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/zones").param("rootOnly", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].name").value("Montserrat"));
+    }
+
+    @Test
+    void list_withRootOnlyAndName_combinesBothFilters() throws Exception {
+        when(zoneService.search(isNull(), eq(true), eq("Mur"), any())).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/zones").param("rootOnly", "true").param("name", "Mur"))
+                .andExpect(status().isOk());
+
+        verify(zoneService).search(isNull(), eq(true), eq("Mur"), any());
     }
 
     @Test

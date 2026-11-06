@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.services;
 
+import org.springframework.data.jpa.domain.Specification;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,29 +79,18 @@ class RouteServiceTest {
     }
 
     @Test
-    void findAll_returnsMappedResponses() {
+    void search_returnsMappedResponses() {
         Sector sector = sector(1L);
         Pageable pageable = PageRequest.of(0, 20);
         Page<Route> routePage = new PageImpl<>(
                 List.of(route(1L, sector, "La Rambla"), route(2L, sector, "Bla")), pageable, 2);
-        when(routeRepository.findAll(pageable)).thenReturn(routePage);
+        when(routeRepository.findAll(org.mockito.ArgumentMatchers.<Specification<Route>>any(), eq(pageable)))
+                .thenReturn(routePage);
 
-        Page<RouteResponse> result = routeService.findAll(pageable);
+        Page<RouteResponse> result = routeService.search(null, null, pageable);
 
         assertThat(result.getContent()).extracting(RouteResponse::name).containsExactly("La Rambla", "Bla");
         assertThat(result.getTotalElements()).isEqualTo(2);
-    }
-
-    @Test
-    void findBySectorId_returnsMappedResponses() {
-        Sector sector = sector(1L);
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<Route> routePage = new PageImpl<>(List.of(route(1L, sector, "La Rambla")), pageable, 1);
-        when(routeRepository.findBySectorId(1L, pageable)).thenReturn(routePage);
-
-        Page<RouteResponse> result = routeService.findBySectorId(1L, pageable);
-
-        assertThat(result.getContent()).extracting(RouteResponse::name).containsExactly("La Rambla");
     }
 
     @Test

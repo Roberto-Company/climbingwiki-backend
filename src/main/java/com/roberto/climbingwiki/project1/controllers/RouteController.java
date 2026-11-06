@@ -34,9 +34,7 @@ public class RouteController {
             @RequestParam(required = false) Long sectorId,
             @RequestParam(required = false) String name,
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        if (sectorId != null) return PagedResponse.from(routeService.findBySectorId(sectorId, pageable));
-        if (name != null && !name.isBlank()) return PagedResponse.from(routeService.findByName(name, pageable));
-        return PagedResponse.from(routeService.findAll(pageable));
+        return PagedResponse.from(routeService.search(sectorId, name, pageable));
     }
 
     @GetMapping("/{id}")

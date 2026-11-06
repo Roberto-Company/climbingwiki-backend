@@ -1,5 +1,7 @@
 package com.roberto.climbingwiki.project1.controllers;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,7 +49,7 @@ class CragControllerTest {
     @Test
     void list_returnsAllCrags() throws Exception {
         Page<CragResponse> page = new PageImpl<>(List.of(response(1L, "Montserrat"), response(2L, "Siurana")));
-        when(cragService.findAll(any())).thenReturn(page);
+        when(cragService.search(isNull(), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/crags"))
                 .andExpect(status().isOk())
@@ -58,12 +60,22 @@ class CragControllerTest {
     @Test
     void list_withZoneId_filtersByZone() throws Exception {
         Page<CragResponse> page = new PageImpl<>(List.of(response(1L, "Montserrat")));
-        when(cragService.findByZoneId(eq(7L), any())).thenReturn(page);
+        when(cragService.search(eq(7L), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/crags").param("zoneId", "7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].name").value("Montserrat"));
+    }
+
+    @Test
+    void list_withZoneIdAndName_combinesBothFilters() throws Exception {
+        when(cragService.search(eq(7L), eq("Cejo"), any())).thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/crags").param("zoneId", "7").param("name", "Cejo"))
+                .andExpect(status().isOk());
+
+        verify(cragService).search(eq(7L), eq("Cejo"), any());
     }
 
     @Test
