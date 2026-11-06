@@ -22,9 +22,11 @@ public record RouteResponse(
         BigDecimal longitude,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        Set<String> tags) {
+        Set<String> tags,
+        Long hardestGradeId,
+        Integer totalLengthM) {
 
-    public static RouteResponse from(Route route) {
+    public static RouteResponse from(Route route, RouteSummary summary) {
         return new RouteResponse(
                 route.getId(),
                 route.getSector().getId(),
@@ -39,6 +41,8 @@ public record RouteResponse(
                 route.getLongitude(),
                 route.getCreatedAt(),
                 route.getUpdatedAt(),
-                route.getTags().stream().map(Tag::getName).collect(Collectors.toSet()));
+                route.getTags().stream().map(Tag::getName).collect(Collectors.toSet()),
+                summary.hardestGradeId(),
+                summary.totalLengthM());
     }
 }

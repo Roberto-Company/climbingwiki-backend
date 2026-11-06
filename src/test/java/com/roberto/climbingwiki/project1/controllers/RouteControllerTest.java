@@ -48,7 +48,7 @@ class RouteControllerTest {
     private RouteResponse response(Long id, String name) {
         return new RouteResponse(
                 id, 1L, null, name, Route.RouteType.SPORT, "desc", "notes", "John Doe", null, null, null, null, null,
-                Set.of("classic"));
+                Set.of("classic"), 12L, 45);
     }
 
     @Test
@@ -60,6 +60,8 @@ class RouteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.content[0].name").value("La Rambla"))
+                .andExpect(jsonPath("$.content[0].hardestGradeId").value(12))
+                .andExpect(jsonPath("$.content[0].totalLengthM").value(45))
                 .andExpect(jsonPath("$.totalElements").value(2));
     }
 
