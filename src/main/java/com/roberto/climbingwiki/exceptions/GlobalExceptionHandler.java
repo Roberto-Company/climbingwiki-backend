@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -18,7 +19,7 @@ public class GlobalExceptionHandler {
             RatingNotFoundException.class, GradingSystemNotFoundException.class, PhotoNotFoundException.class,
             CommentNotFoundException.class, LogbookEntryNotFoundException.class,
             FavoriteNotFoundException.class, FollowNotFoundException.class, RouteListNotFoundException.class,
-            ListRouteNotFoundException.class})
+            ListRouteNotFoundException.class, AvatarNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError(ex.getMessage()));
     }
@@ -33,7 +34,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({InvalidRatingScoreException.class, InvalidPhotoTargetException.class,
             InvalidZoneParentException.class, InvalidCommentTargetException.class,
             InvalidCommentParentException.class, InvalidFollowException.class,
-            InvalidOrExpiredTokenException.class})
+            InvalidOrExpiredTokenException.class, InvalidImageException.class})
     public ResponseEntity<ApiError> handleBusinessRuleViolation(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiError(ex.getMessage()));
     }
@@ -51,6 +52,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyLoginAttemptsException.class)
     public ResponseEntity<ApiError> handleTooManyRequests(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError(ex.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(new ApiError("File is too large"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
