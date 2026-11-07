@@ -1,5 +1,6 @@
 package com.roberto.climbingwiki.config;
 
+import com.roberto.climbingwiki.repositories.UserRepository;
 import com.roberto.climbingwiki.security.JwtAuthenticationFilter;
 import com.roberto.climbingwiki.security.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,7 +26,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtService jwtService, CorsConfigurationSource corsConfigurationSource) throws Exception {
+            HttpSecurity http,
+            JwtService jwtService,
+            UserRepository userRepository,
+            CorsConfigurationSource corsConfigurationSource)
+            throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -43,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/grades/**", "/api/grading-systems/**").hasRole("ADMIN")
                         .requestMatchers("/api/tags/**").hasAnyRole("MODERATOR", "ADMIN")
                         .anyRequest().authenticated())
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
