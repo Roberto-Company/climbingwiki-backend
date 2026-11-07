@@ -10,4 +10,6 @@ public interface FavoriteRepository extends JpaRepository<Favorite, FavoriteId> 
     List<Favorite> findByRouteId(Long routeId);
 
     List<Favorite> findByUserId(Long userId);
+
+    long countByUserId(Long userId);
 }
