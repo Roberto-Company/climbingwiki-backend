@@ -11,11 +11,10 @@ import com.roberto.climbingwiki.model.entities.User;
 import com.roberto.climbingwiki.repositories.UserRepository;
 import com.roberto.climbingwiki.security.AuthenticatedUser;
 import com.roberto.climbingwiki.security.JwtService;
+import com.roberto.climbingwiki.services.mail.AccountMailer;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,22 +25,23 @@ public class AuthService {
     private static final Duration VERIFICATION_TOKEN_TTL = Duration.ofHours(24);
     private static final Duration RESET_TOKEN_TTL = Duration.ofHours(1);
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
-
     private final UserRepository userRepository;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AccountMailer accountMailer;
 
     public AuthService(
             UserRepository userRepository,
             UserService userService,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            AccountMailer accountMailer) {
         this.userRepository = userRepository;
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.accountMailer = accountMailer;
     }
 
     @Transactional
@@ -61,7 +61,7 @@ public class AuthService {
         user.setVerificationToken(token);
         user.setVerificationTokenExpiresAt(LocalDateTime.now().plus(VERIFICATION_TOKEN_TTL));
         userRepository.save(user);
-        log.info("Verification token for {}: {}", user.getEmail(), token);
+        accountMailer.sendEmailVerification(user.getEmail(), user.getUsername(), token);
 
         return created;
     }
@@ -93,17 +93,19 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    /**
+     * Mails a reset link if the email belongs to an account. Unknown emails are ignored silently so
+     * the endpoint can't be used to find out who is registered.
+     */
     @Transactional
-    public String requestPasswordReset(String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
-
-        String token = UUID.randomUUID().toString();
-        user.setResetToken(token);
-        user.setResetTokenExpiresAt(LocalDateTime.now().plus(RESET_TOKEN_TTL));
-        userRepository.save(user);
-        log.info("Password reset token for {}: {}", user.getEmail(), token);
-
-        return token;
+    public void requestPasswordReset(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            String token = UUID.randomUUID().toString();
+            user.setResetToken(token);
+            user.setResetTokenExpiresAt(LocalDateTime.now().plus(RESET_TOKEN_TTL));
+            userRepository.save(user);
+            accountMailer.sendPasswordReset(user.getEmail(), user.getUsername(), token);
+        });
     }
 
     @Transactional
