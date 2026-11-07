@@ -76,7 +76,7 @@ docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data load
 | `JWT_SECRET` | **required** | Token signing key, at least 32 bytes (`openssl rand -base64 48`). No fallback outside the `dev` profile |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Token lifetime |
 | `TRUSTED_PROXIES` | loopback | Proxies whose `X-Forwarded-For` is trusted (the frontend server) |
-| `CORS_ALLOWED_ORIGINS` | none | Browser origins allowed to call the API directly, comma-separated. The site calls it server-side, so leave empty |
+| `CORS_ALLOWED_ORIGINS` | none | Browser origins allowed to call the API directly, comma-separated. The site calls it server-side, so leave empty. Behind an HTTPS proxy, add the API's own public origin so Swagger UI's "Try it out" works |
 | `FRONTEND_URL` | `http://localhost:3000` | Site address used in password-reset and verification links |
 | `SPRING_MAIL_HOST` | unset | SMTP server for account emails. Unset: no email is sent |
 | `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | unset | SMTP port and credentials (STARTTLS) |
