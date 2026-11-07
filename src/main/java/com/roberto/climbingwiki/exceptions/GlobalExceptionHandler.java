@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiError(ex.getMessage()));
     }
 
-    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    @ExceptionHandler({TooManyLoginAttemptsException.class, TooManyRequestsException.class})
     public ResponseEntity<ApiError> handleTooManyRequests(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError(ex.getMessage()));
     }

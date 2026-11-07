@@ -60,4 +60,21 @@ class JwtServiceTest {
 
         assertThat(parsed.role()).isEqualTo(User.Role.ADMIN);
     }
+
+    @Test
+    void constructor_missingSecret_failsStartupWithClearMessage() {
+        assertThatThrownBy(() -> new JwtService("", 60_000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+        assertThatThrownBy(() -> new JwtService(null, 60_000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
+    void constructor_secretShorterThan32Bytes_failsStartup() {
+        assertThatThrownBy(() -> new JwtService("too-short-secret", 60_000))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("32");
+    }
 }

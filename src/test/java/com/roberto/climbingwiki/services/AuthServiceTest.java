@@ -3,7 +3,10 @@ package com.roberto.climbingwiki.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +21,7 @@ import com.roberto.climbingwiki.model.entities.User;
 import com.roberto.climbingwiki.repositories.UserRepository;
 import com.roberto.climbingwiki.security.AuthenticatedUser;
 import com.roberto.climbingwiki.security.JwtService;
+import com.roberto.climbingwiki.services.mail.AccountMailer;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,11 +46,14 @@ class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private AccountMailer accountMailer;
+
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, userService, passwordEncoder, jwtService);
+        authService = new AuthService(userRepository, userService, passwordEncoder, jwtService, accountMailer);
     }
 
     private User user(Long id, String username, String passwordHash, User.Role role) {
@@ -154,25 +161,41 @@ class AuthServiceTest {
     }
 
     @Test
-    void requestPasswordReset_existingEmail_returnsTokenAndPersistsExpiry() {
+    void register_mailsVerificationTokenToNewUser() {
+        when(userService.create(any())).thenReturn(
+                new UserResponse(1L, "alice", "alice@test.com", null, null, null, User.Role.USER, null));
+        User saved = user(1L, "alice", "hashed", User.Role.USER);
+        saved.setEmail("alice@test.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(saved));
+
+        authService.register(new UserRequest("alice", "alice@test.com", "password123", null, null, null, null));
+
+        verify(accountMailer).sendEmailVerification(eq("alice@test.com"), eq("alice"), argThat(t -> t != null
+                && t.equals(saved.getVerificationToken())));
+    }
+
+    @Test
+    void requestPasswordReset_existingEmail_persistsTokenAndMailsIt() {
         User existing = user(1L, "alice", "hashed", User.Role.USER);
         existing.setEmail("alice@test.com");
         when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(existing));
 
-        String token = authService.requestPasswordReset("alice@test.com");
+        authService.requestPasswordReset("alice@test.com");
 
-        assertThat(token).isNotBlank();
-        verify(userRepository).save(argThat(u -> token.equals(u.getResetToken())
+        verify(userRepository).save(argThat(u -> u.getResetToken() != null
                 && u.getResetTokenExpiresAt() != null
                 && u.getResetTokenExpiresAt().isAfter(LocalDateTime.now())));
+        verify(accountMailer).sendPasswordReset("alice@test.com", "alice", existing.getResetToken());
     }
 
     @Test
-    void requestPasswordReset_unknownEmail_throwsUserNotFound() {
+    void requestPasswordReset_unknownEmail_doesNothingAndDoesNotThrow() {
         when(userRepository.findByEmail("ghost@test.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.requestPasswordReset("ghost@test.com"))
-                .isInstanceOf(UserNotFoundException.class);
+        authService.requestPasswordReset("ghost@test.com");
+
+        verify(userRepository, never()).save(any());
+        verify(accountMailer, never()).sendPasswordReset(anyString(), anyString(), anyString());
     }
 
     @Test

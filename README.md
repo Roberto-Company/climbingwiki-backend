@@ -61,10 +61,10 @@ Requires Java 21 and Docker.
 
 ```bash
 docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data loaded
-./mvnw spring-boot:run       # API on http://localhost:8080
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # API on http://localhost:8080
 ```
 
-`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema. The `seed-grades` profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades`) reloads the grade tables from CSV.
+`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema. The `dev` profile only supplies a local JWT secret; without it (or `JWT_SECRET`) the API refuses to start. The `seed-grades` profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades`) reloads the grade tables from CSV.
 
 ### Configuration
 
@@ -73,9 +73,15 @@ docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data load
 | `DB_PASSWORD` | `climbingwiki` | MySQL root password |
 | `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3308/climbingwiki…` | Override the database location |
 | `SPRING_JPA_SHOW_SQL` | `true` | Log every SQL statement (off in Docker) |
-| `JWT_SECRET` | dev-only value | Token signing key; **set it** anywhere but your machine |
+| `JWT_SECRET` | **required** | Token signing key, at least 32 bytes (`openssl rand -base64 48`). No fallback outside the `dev` profile |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Token lifetime |
 | `TRUSTED_PROXIES` | loopback | Proxies whose `X-Forwarded-For` is trusted (the frontend server) |
+| `FRONTEND_URL` | `http://localhost:3000` | Site address used in password-reset and verification links |
+| `SPRING_MAIL_HOST` | unset | SMTP server for account emails. Unset: no email is sent |
+| `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | unset | SMTP port and credentials (STARTTLS) |
+| `MAIL_FROM` | `ClimbingWiki <no-reply@localhost>` | Sender of account emails |
+| `MAIL_SMTP_AUTH` / `MAIL_SMTP_STARTTLS` | `true` / `true` | Turn off for an SMTP relay without login or TLS |
+| `MAIL_LOG_LINKS` | `false` (`true` in `dev` and Docker) | Write reset/verification links to the log when there is no SMTP. Never on a public server |
 
 ## Tests
 

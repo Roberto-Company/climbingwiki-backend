@@ -1,7 +1,6 @@
 package com.roberto.climbingwiki.controllers;
 
 import com.roberto.climbingwiki.dtos.ForgotPasswordRequest;
-import com.roberto.climbingwiki.dtos.ForgotPasswordResponse;
 import com.roberto.climbingwiki.dtos.LoginRequest;
 import com.roberto.climbingwiki.dtos.LoginResponse;
 import com.roberto.climbingwiki.dtos.ResetPasswordRequest;
@@ -9,6 +8,7 @@ import com.roberto.climbingwiki.dtos.UserRequest;
 import com.roberto.climbingwiki.dtos.UserResponse;
 import com.roberto.climbingwiki.dtos.VerifyEmailRequest;
 import com.roberto.climbingwiki.exceptions.TooManyLoginAttemptsException;
+import com.roberto.climbingwiki.exceptions.TooManyRequestsException;
 import com.roberto.climbingwiki.security.ClientIpResolver;
 import com.roberto.climbingwiki.security.LoginRateLimiterService;
 import com.roberto.climbingwiki.services.AuthService;
@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final String FORGOT_PASSWORD_KEY_PREFIX = "forgot-password:";
 
     private final AuthService authService;
     private final LoginRateLimiterService loginRateLimiterService;
@@ -57,9 +59,15 @@ public class AuthController {
         authService.verifyEmail(request.token());
     }
 
+    /** Always 204, registered email or not. Limited per IP so it can't be used to flood inboxes. */
     @PostMapping("/forgot-password")
-    public ForgotPasswordResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        return new ForgotPasswordResponse(authService.requestPasswordReset(request.email()));
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        String key = FORGOT_PASSWORD_KEY_PREFIX + clientIpResolver.resolve(httpRequest);
+        if (!loginRateLimiterService.tryConsume(key)) {
+            throw new TooManyRequestsException("Too many password reset requests, try again later");
+        }
+        authService.requestPasswordReset(request.email());
     }
 
     @PostMapping("/reset-password")

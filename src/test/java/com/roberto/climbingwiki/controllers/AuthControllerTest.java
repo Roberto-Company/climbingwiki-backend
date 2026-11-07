@@ -3,8 +3,10 @@ package com.roberto.climbingwiki.controllers;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -139,24 +141,26 @@ class AuthControllerTest {
     }
 
     @Test
-    void forgotPassword_existingEmail_returnsToken() throws Exception {
-        when(authService.requestPasswordReset("alice@test.com")).thenReturn("reset-tok");
+    void forgotPassword_returns204WithoutToken() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"alice@test.com\"}"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(authService).requestPasswordReset("alice@test.com");
+    }
+
+    @Test
+    void forgotPassword_rateLimited_returns429AndSendsNothing() throws Exception {
+        when(loginRateLimiterService.tryConsume("forgot-password:198.51.100.7")).thenReturn(false);
 
         mockMvc.perform(post("/api/auth/forgot-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"alice@test.com\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resetToken").value("reset-tok"));
-    }
+                .andExpect(status().isTooManyRequests());
 
-    @Test
-    void forgotPassword_unknownEmail_returns404() throws Exception {
-        when(authService.requestPasswordReset("ghost@test.com")).thenThrow(new UserNotFoundException("ghost@test.com"));
-
-        mockMvc.perform(post("/api/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"ghost@test.com\"}"))
-                .andExpect(status().isNotFound());
+        verify(authService, never()).requestPasswordReset(any());
     }
 
     @Test

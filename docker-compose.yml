@@ -44,6 +44,8 @@ services:
       # Local demo value. Set a long random JWT_SECRET anywhere else.
       JWT_SECRET: ${JWT_SECRET:-local-docker-demo-secret-not-for-real-deployments-0123456789}
       SPRING_JPA_SHOW_SQL: "false"
+      # No SMTP in the local demo: reset/verification links appear in `docker compose logs backend`.
+      MAIL_LOG_LINKS: "true"
       # Only the frontend container may pass on the visitor's IP (login rate limit).
       TRUSTED_PROXIES: 172.30.0.10
     ports:
