@@ -2,7 +2,8 @@
 -- (docker-compose.yml mounts this folder into /docker-entrypoint-initdb.d).
 --
 -- Contents: grading systems and grades, zones, crags, sectors, routes and pitches,
--- plus the two importer accounts that own the imported rows (no usable password).
+-- plus the two importer accounts that own the imported rows. Their password hashes
+-- are replaced with "!" (matches no password): they cannot log in.
 --
 -- Licences: crag locations (c) OpenStreetMap contributors, ODbL.
 -- Mula routes: theCrag contributors, CC BY-NC-SA. This file is shared under the same terms.
@@ -23,8 +24,8 @@ USE climbingwiki;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `full_name`, `bio`, `avatar_url`, `role`, `email_verified`, `verification_token`, `verification_token_expires_at`, `reset_token`, `reset_token_expires_at`, `created_at`) VALUES (2,'data-importer','data-importer@climbingwiki.local','$2a$10$plMQIJ3tAXdBq186OfodwORPjhYazlgAJbm5RqAvA/UjkHZAqkdfG',NULL,NULL,NULL,'USER',0,'44aaba7f-8894-40ab-b6ce-adaaafd4ef5a','2026-11-05 18:55:06',NULL,NULL,'2026-11-04 18:55:06');
-INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `full_name`, `bio`, `avatar_url`, `role`, `email_verified`, `verification_token`, `verification_token_expires_at`, `reset_token`, `reset_token_expires_at`, `created_at`) VALUES (1,'osm-importer','osm-importer@climbingwiki.local','$2a$10$g2ONw7.vnpbGamOEwCI5R.YIAGJc82fsLaD475U1lRK5/r1nR1kR6',NULL,NULL,NULL,'USER',0,'47429f09-75f4-4bdd-879b-40ade017a6fe','2026-11-05 18:46:39',NULL,NULL,'2026-11-04 18:46:39');
+INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `full_name`, `bio`, `avatar_url`, `role`, `email_verified`, `verification_token`, `verification_token_expires_at`, `reset_token`, `reset_token_expires_at`, `created_at`) VALUES (2,'data-importer','data-importer@climbingwiki.local','!',NULL,NULL,NULL,'USER',0,'44aaba7f-8894-40ab-b6ce-adaaafd4ef5a','2026-11-05 18:55:06',NULL,NULL,'2026-11-04 18:55:06');
+INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `full_name`, `bio`, `avatar_url`, `role`, `email_verified`, `verification_token`, `verification_token_expires_at`, `reset_token`, `reset_token_expires_at`, `created_at`) VALUES (1,'osm-importer','osm-importer@climbingwiki.local','!',NULL,NULL,NULL,'USER',0,'47429f09-75f4-4bdd-879b-40ade017a6fe','2026-11-05 18:46:39',NULL,NULL,'2026-11-04 18:46:39');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

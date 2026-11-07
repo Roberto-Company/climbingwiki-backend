@@ -20,7 +20,8 @@ dump() {
 -- (docker-compose.yml mounts this folder into /docker-entrypoint-initdb.d).
 --
 -- Contents: grading systems and grades, zones, crags, sectors, routes and pitches,
--- plus the two importer accounts that own the imported rows (no usable password).
+-- plus the two importer accounts that own the imported rows. Their password hashes
+-- are replaced with "!" (matches no password): they cannot log in.
 --
 -- Licences: crag locations (c) OpenStreetMap contributors, ODbL.
 -- Mula routes: theCrag contributors, CC BY-NC-SA. This file is shared under the same terms.
@@ -30,7 +31,10 @@ dump() {
 USE climbingwiki;
 HEADER
   # Only the importer accounts: real or demo users are never exported.
-  dump users --where="username IN ('osm-importer','data-importer')"
+  # Their password hashes are replaced with "!", which matches no password, so the
+  # importers' real credentials never leave the local database.
+  dump users --where="username IN ('osm-importer','data-importer')" \
+    | sed -E 's/'"'"'[$]2[aby][$][0-9]{2}[$][./A-Za-z0-9]{53}'"'"'/'"'"'!'"'"'/g'
   dump grading_systems grades zones crags sectors routes pitches
 } > "$OUT"
 
