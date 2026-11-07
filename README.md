@@ -64,7 +64,7 @@ docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data load
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # API on http://localhost:8080
 ```
 
-`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema. The `dev` profile only supplies a local JWT secret; without it (or `JWT_SECRET`) the API refuses to start. The `seed-grades` profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades`) reloads the grade tables from CSV.
+`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema. The `dev` profile supplies a local JWT secret, logs SQL and writes reset/verification links to the log; without it (or `JWT_SECRET`) the API refuses to start. The `seed-grades` profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades`) reloads the grade tables from CSV.
 
 ### Configuration
 
@@ -72,10 +72,11 @@ docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data load
 |---|---|---|
 | `DB_PASSWORD` | `climbingwiki` | MySQL root password |
 | `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3308/climbingwiki…` | Override the database location |
-| `SPRING_JPA_SHOW_SQL` | `true` | Log every SQL statement (off in Docker) |
+| `SPRING_JPA_SHOW_SQL` | `false` (`true` in `dev`) | Log every SQL statement |
 | `JWT_SECRET` | **required** | Token signing key, at least 32 bytes (`openssl rand -base64 48`). No fallback outside the `dev` profile |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Token lifetime |
 | `TRUSTED_PROXIES` | loopback | Proxies whose `X-Forwarded-For` is trusted (the frontend server) |
+| `CORS_ALLOWED_ORIGINS` | none | Browser origins allowed to call the API directly, comma-separated. The site calls it server-side, so leave empty. Behind an HTTPS proxy, add the API's own public origin so Swagger UI's "Try it out" works |
 | `FRONTEND_URL` | `http://localhost:3000` | Site address used in password-reset and verification links |
 | `SPRING_MAIL_HOST` | unset | SMTP server for account emails. Unset: no email is sent |
 | `SPRING_MAIL_PORT` / `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | unset | SMTP port and credentials (STARTTLS) |
