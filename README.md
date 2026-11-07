@@ -1,5 +1,7 @@
 # ClimbingWiki — backend
 
+[![CI](https://github.com/Roberto-Company/climbingwiki-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/Roberto-Company/climbingwiki-backend/actions/workflows/ci.yml)
+
 REST API for **ClimbingWiki**, a community wiki and logbook for rock climbing. It models the guidebook hierarchy (zones → crags → sectors → routes → pitches, with grading systems and grades) plus a personal layer for climbers (logbook, ratings, comments, photos, favorites, route lists, follows).
 
 > Portfolio project. Not a production service. The web client lives in [climbingwiki-frontend](https://github.com/Roberto-Company/climbingwiki-frontend).
