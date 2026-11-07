@@ -1,19 +1,76 @@
+# ClimbingWiki full stack: MySQL + Spring Boot API + Next.js site.
+#
+#   docker compose up --build        -> http://localhost:3000
+#
+# Expects the frontend repo next to this one (../climbingwiki-frontend); override with FRONTEND_DIR.
+# The database is created and seeded on first start only (see database/docker/).
+# To start over with fresh data: docker compose down -v
+#
+# Local backend development: `docker compose up -d db` and run the API with ./mvnw.
+name: climbingwiki
+
 services:
   db:
     image: mysql:8.4
-    container_name: climbingwiki-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-climbingwiki}
+      TZ: UTC
     ports:
-      - "3307:3306"
+      - "${DB_PORT:-3308}:3306"
     volumes:
-      - climbingwiki-db-data:/var/lib/mysql
+      - db-data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/docker/02-catalog-data.sql:/docker-entrypoint-initdb.d/02-catalog-data.sql:ro
+      - ./database/docker/03-demo-users.sql:/docker-entrypoint-initdb.d/03-demo-users.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      # TCP, not the socket: the temporary server that runs the seed scripts has networking off.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 20s
+    networks: [climbingwiki]
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/climbingwiki?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-climbingwiki}
+      # Local demo value. Set a long random JWT_SECRET anywhere else.
+      JWT_SECRET: ${JWT_SECRET:-local-docker-demo-secret-not-for-real-deployments-0123456789}
+      SPRING_JPA_SHOW_SQL: "false"
+      # Only the frontend container may pass on the visitor's IP (login rate limit).
+      TRUSTED_PROXIES: 172.30.0.10
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks: [climbingwiki]
+
+  frontend:
+    build: ${FRONTEND_DIR:-../climbingwiki-frontend}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: http://backend:8080/api
+      # Production build served on plain http://localhost.
+      SESSION_COOKIE_SECURE: "false"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      climbingwiki:
+        ipv4_address: 172.30.0.10
 
 volumes:
-  climbingwiki-db-data:
+  db-data:
+
+networks:
+  climbingwiki:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

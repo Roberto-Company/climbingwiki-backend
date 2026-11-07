@@ -23,34 +23,53 @@ REST API for **ClimbingWiki**, a community wiki and logbook for rock climbing. I
 - **Login rate limit per real client IP:** `X-Forwarded-For` is trusted only from configured proxies; idle buckets are evicted.
 - **Data import:** grade tables seeded from CSV; crags from OpenStreetMap and routes from theCrag/OpenBeta, upserted by external id so imports can be re-run.
 
-## Run locally
+## Run it
+
+### Whole stack with Docker (one command)
+
+Requires Docker only. Clone this repo and [climbingwiki-frontend](https://github.com/Roberto-Company/climbingwiki-frontend) into the same folder, then:
+
+```bash
+docker compose up --build
+```
+
+| What | URL |
+|---|---|
+| Website | http://localhost:3000 |
+| Swagger UI | http://localhost:8080/swagger-ui/index.html |
+| Health check | http://localhost:8080/actuator/health |
+
+On the first start MySQL creates the schema and loads the catalog (19 zones, 24 crags, 59 sectors, 129 routes) and three demo accounts, all with the password `climbing-demo`:
+
+| User | Role | Can |
+|---|---|---|
+| `demo` | USER | logbook, ratings, comments, lists; add data (starts unverified) |
+| `moderator` | MODERATOR | everything above, plus verify/edit any data and use the review page |
+| `admin` | ADMIN | everything, including grade scales |
+
+- Start over with fresh data: `docker compose down -v && docker compose up`
+- Ports clash? Set `FRONTEND_PORT`, `BACKEND_PORT` or `DB_PORT` (defaults 3000, 8080, 3308).
+- Frontend repo elsewhere? Set `FRONTEND_DIR`.
+- The seed files live in `database/docker/`. `scripts/dump-catalog-data.sh` regenerates the catalog dump from a running database.
+
+### Backend development
 
 Requires Java 21 and Docker.
 
 ```bash
-# 1. Database (MySQL 8.4 on localhost:3307)
-echo MYSQL_ROOT_PASSWORD=climbingwiki > .env
-docker compose up -d
-docker exec -i climbingwiki-db mysql -uroot -pclimbingwiki < database/schema.sql
-
-# 2. API on http://localhost:8080
-DB_PASSWORD=climbingwiki ./mvnw spring-boot:run
-
-# 3. Optional: load the grading systems and grades
-DB_PASSWORD=climbingwiki ./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades
+docker compose up -d db      # MySQL 8.4 on localhost:3308, schema and data loaded
+./mvnw spring-boot:run       # API on http://localhost:8080
 ```
 
-`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema.
-
-- Swagger UI: http://localhost:8080/swagger-ui/index.html
-- Health check: http://localhost:8080/actuator/health
+`database/schema.sql` creates a fresh database. The `database/alter_*.sql` files only upgrade databases created with older versions of the schema. The `seed-grades` profile (`./mvnw spring-boot:run -Dspring-boot.run.profiles=seed-grades`) reloads the grade tables from CSV.
 
 ### Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `DB_PASSWORD` | `climbingwiki` | MySQL root password |
-| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3307/climbingwiki…` | Override the database location |
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3308/climbingwiki…` | Override the database location |
+| `SPRING_JPA_SHOW_SQL` | `true` | Log every SQL statement (off in Docker) |
 | `JWT_SECRET` | dev-only value | Token signing key; **set it** anywhere but your machine |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Token lifetime |
 | `TRUSTED_PROXIES` | loopback | Proxies whose `X-Forwarded-For` is trusted (the frontend server) |
