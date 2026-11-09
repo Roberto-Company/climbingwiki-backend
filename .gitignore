@@ -34,3 +34,6 @@ build/
 
 ### Docker ###
 .env
+
+# Credentials for scripts/load-remote-db.sh
+.env.remote-db
