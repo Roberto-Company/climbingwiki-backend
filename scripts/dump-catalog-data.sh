@@ -25,6 +25,7 @@ dump() {
 --
 -- Licences: crag locations (c) OpenStreetMap contributors, ODbL.
 -- Mula routes: theCrag contributors, CC BY-NC-SA. This file is shared under the same terms.
+-- US areas (Yosemite, Smith Rock, Joshua Tree): OpenBeta, CC0.
 --
 -- Regenerate from a local database with scripts/dump-catalog-data.sh.
 
